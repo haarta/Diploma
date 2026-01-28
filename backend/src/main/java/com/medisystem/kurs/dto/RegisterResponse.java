@@ -1,0 +1,1 @@
+package com.medisystem.kurs.dto;
