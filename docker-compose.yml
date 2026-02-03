@@ -1,9 +1,9 @@
 
+
 services:
   postgres:
     image: postgres:15
     container_name: diploma_postgres
-    restart: always
     environment:
       POSTGRES_DB: diploma_db
       POSTGRES_USER: diploma_user
@@ -12,6 +12,29 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  backend:
+    build: .
+    container_name: diploma_backend
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/diploma_db
+      SPRING_DATASOURCE_USERNAME: diploma_user
+      SPRING_DATASOURCE_PASSWORD: diploma_pass
+    ports:
+      - "8080:8080"
+    restart: always
+
+  frontend:
+    build: ./medical-frontend
+    container_name: diploma_frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    restart: always
 
 volumes:
   postgres_data:
