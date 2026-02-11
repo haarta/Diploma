@@ -1,9 +1,7 @@
-
-
 services:
-  postgres:
-    image: postgres:15
-    container_name: diploma_postgres
+  db:
+    image: postgres:16
+    container_name: diploma_db
     environment:
       POSTGRES_DB: diploma_db
       POSTGRES_USER: diploma_user
@@ -11,30 +9,35 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: always
+      - diploma_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U diploma_user -d diploma_db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   backend:
     build: .
     container_name: diploma_backend
     depends_on:
-      - postgres
+      db:
+        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/diploma_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/diploma_db
       SPRING_DATASOURCE_USERNAME: diploma_user
       SPRING_DATASOURCE_PASSWORD: diploma_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
     ports:
       - "8080:8080"
-    restart: always
+
 
   frontend:
     build: ./medical-frontend
-    container_name: diploma_frontend
-    depends_on:
-      - backend
     ports:
       - "5173:5173"
-    restart: always
+    depends_on:
+      - backend
 
 volumes:
-  postgres_data:
+  diploma_pgdata:
