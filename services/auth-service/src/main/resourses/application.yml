@@ -1,0 +1,22 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${DB_NAME:diploma_db}
+    username: ${DB_USER:diploma_user}
+    password: ${DB_PASSWORD:diploma_password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:change_me_to_a_real_secret_change_me}
+    access-ttl-minutes: ${AUTH_ACCESS_TTL_MIN:15}
+    refresh-ttl-days: ${AUTH_REFRESH_TTL_DAYS:14}
+    issuer: ${AUTH_ISSUER:medisystem-auth}
