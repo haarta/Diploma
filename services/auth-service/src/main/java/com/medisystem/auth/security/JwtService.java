@@ -2,6 +2,7 @@ package com.medisystem.auth.security;
 
 import com.medisystem.auth.config.AuthProperties;
 import com.medisystem.auth.entity.Role;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Service
 public class JwtService {
+
     private final AuthProperties props;
     private final SecretKey key;
 
@@ -25,7 +27,7 @@ public class JwtService {
 
     public String createAccessToken(long userId, String email, Role role) {
         Instant now = Instant.now();
-        Instant exp = now.plusSeconds(props.getAccessTtlMinutes() * 60);
+        Instant exp = now.plusSeconds(props.getAccessTtlMinutes() * 60L);
 
         return Jwts.builder()
                 .issuer(props.getIssuer())
@@ -40,10 +42,9 @@ public class JwtService {
                 .compact();
     }
 
-
     public String createRefreshToken(String jti, long userId) {
         Instant now = Instant.now();
-        Instant exp = now.plusSeconds(props.getRefreshTtlDays() * 24 * 3600);
+        Instant exp = now.plusSeconds(props.getRefreshTtlDays() * 24L * 3600L);
 
         return Jwts.builder()
                 .issuer(props.getIssuer())
@@ -56,7 +57,7 @@ public class JwtService {
                 .compact();
     }
 
-    public io.jsonwebtoken.Claims parseClaims(String jwt) {
+    public Claims parseClaims(String jwt) {
         return Jwts.parser()
                 .verifyWith(key)
                 .build()

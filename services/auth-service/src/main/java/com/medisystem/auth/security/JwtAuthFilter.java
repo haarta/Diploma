@@ -7,12 +7,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 public class JwtAuthFilter extends OncePerRequestFilter {
+
     private final JwtService jwtService;
 
     public JwtAuthFilter(JwtService jwtService) {
@@ -20,26 +24,55 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain chain
+    ) throws ServletException, IOException {
 
         String auth = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (auth != null && auth.startsWith("Bearer ")) {
-            String token = auth.substring(7);
-            try {
-                Claims c = jwtService.parseClaims(token);
-                String role = c.get("role", String.class);
-                String email = c.get("email", String.class);
-                long userId = Long.parseLong(c.getSubject());
 
-                var principal = new UserPrincipal(userId, email, role);
-                var authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (Exception ignored) {
-                // если токен плохой, просто не аутентифицируем
-            }
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
         }
 
-        chain.doFilter(request, response);
+        String token = auth.substring(7).trim(); // trim на всякий случай
+
+        try {
+            Claims claims = jwtService.parseClaims(token);
+
+            // refresh-токеном нельзя аутентифицироваться
+            String typ = claims.get("typ", String.class);
+            if ("refresh".equalsIgnoreCase(typ)) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            long userId = Long.parseLong(claims.getSubject());
+            String email = claims.get("email", String.class);
+            String role = claims.get("role", String.class);
+
+            if (email == null || role == null) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+
+            var principal = new UserPrincipal(userId, email, role);
+
+            // ВАЖНО: ROLE_
+            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+            var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            chain.doFilter(request, response);
+
+        } catch (Exception e) {
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        }
     }
 }

@@ -1,13 +1,13 @@
 package com.medisystem.auth.security;
 
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
 
 public class UserPrincipal implements UserDetails {
+
     private final long userId;
     private final String email;
     private final String role;
@@ -18,15 +18,30 @@ public class UserPrincipal implements UserDetails {
         this.role = role;
     }
 
-    public long getUserId() { return userId; }
-    public String getRole() { return role; }
-
-    @Override public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
+    public long getUserId() {
+        return userId;
     }
 
-    @Override public String getPassword() { return ""; }
-    @Override public String getUsername() { return email; }
+    public String getRole() {
+        return role;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Возвращаем ROLE_..., чтобы Spring нормально понимал роли
+        return List.of((GrantedAuthority) () -> "ROLE_" + role);
+    }
+
+    @Override
+    public String getPassword() {
+        return ""; // мы не используем password из UserDetails
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
