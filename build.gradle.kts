@@ -19,8 +19,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-repositories {
-    mavenCentral()
+subprojects {
+    repositories {
+        mavenCentral()
+    }
 }
 
 dependencies {
