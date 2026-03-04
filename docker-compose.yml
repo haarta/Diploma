@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16
+    container_name: diploma_db
+    environment:
+      POSTGRES_DB: diploma_db
+      POSTGRES_USER: diploma_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - diploma_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U diploma_user -d diploma_db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: diploma_auth
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: diploma_db
+      DB_USER: diploma_user
+      DB_PASSWORD: ${DB_PASSWORD}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+    ports:
+      - "8081:8081"
+
+
+
+  patient-service:
+    build:
+      context: .
+      dockerfile: services/patient-service/Dockerfile
+    container_name: diploma_patient
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: diploma_db
+      DB_USER: diploma_user
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8082:8082"
+
+
+
+  backend:
+    build: .
+    container_name: diploma_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/diploma_db
+      SPRING_DATASOURCE_USERNAME: diploma_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+    ports:
+      - "8080:8080"
+
+
+  frontend:
+    build: ./medical-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  diploma_pgdata:
