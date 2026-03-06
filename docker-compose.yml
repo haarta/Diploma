@@ -16,23 +16,57 @@ services:
       timeout: 3s
       retries: 20
 
+  auth-db:
+    image: postgres:16
+    container_name: diploma_auth_db
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - diploma_auth_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U auth_user -d auth_db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   auth-service:
     build:
       context: .
       dockerfile: services/auth-service/Dockerfile
     container_name: diploma_auth
     depends_on:
-      db:
+      auth-db:
         condition: service_healthy
     environment:
-      DB_HOST: db
+      DB_HOST: auth-db
       DB_PORT: 5432
-      DB_NAME: diploma_db
-      DB_USER: diploma_user
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: auth_db
+      DB_USER: auth_user
+      DB_PASSWORD: ${AUTH_DB_PASSWORD}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
     ports:
       - "8081:8081"
+
+  patient-db:
+    image: postgres:16
+    container_name: diploma_patient_db
+    environment:
+      POSTGRES_DB: patient_db
+      POSTGRES_USER: patient_user
+      POSTGRES_PASSWORD: ${PATIENT_DB_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - diploma_patient_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U patient_user -d patient_db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 
 
@@ -42,14 +76,14 @@ services:
       dockerfile: services/patient-service/Dockerfile
     container_name: diploma_patient
     depends_on:
-      db:
+      patient-db:
         condition: service_healthy
     environment:
-      DB_HOST: db
+      DB_HOST: patient-db
       DB_PORT: 5432
-      DB_NAME: diploma_db
-      DB_USER: diploma_user
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: patient_db
+      DB_USER: patient_user
+      DB_PASSWORD: ${PATIENT_DB_PASSWORD}
     ports:
       - "8082:8082"
 
@@ -81,3 +115,5 @@ services:
 
 volumes:
   diploma_pgdata:
+  diploma_auth_pgdata:
+  diploma_patient_pgdata:

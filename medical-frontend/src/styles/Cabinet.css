@@ -1,0 +1,139 @@
+.cabinet-page {
+  padding: 8px 0 24px;
+}
+
+.cabinet-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cabinet-top h1 {
+  font-size: 42px;
+  font-weight: 500;
+}
+
+.cabinet-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cabinet-refresh,
+.cabinet-logout {
+  border-radius: 9999px;
+  border: 1px solid #d67b2c;
+  background: transparent;
+  color: #d67b2c;
+  padding: 10px 22px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.cabinet-logout {
+  border-color: #888;
+  color: #444;
+}
+
+.cabinet-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 16px;
+}
+
+.cabinet-menu {
+  background: #f0f0f0;
+  border: 1px solid #dfdfdf;
+  padding: 20px;
+}
+
+.cabinet-menu-item {
+  display: block;
+  text-decoration: none;
+  font-size: 20px;
+  color: #222;
+  margin-bottom: 24px;
+  padding-bottom: 10px;
+}
+
+.cabinet-menu-item.active {
+  border-bottom: 2px solid #d67b2c;
+}
+
+.cabinet-card {
+  background: #f7f7f7;
+  border: 1px solid #dfdfdf;
+  padding: 24px;
+  min-height: 260px;
+}
+
+.cabinet-card h2 {
+  margin-bottom: 12px;
+}
+
+.cabinet-card h3 {
+  font-size: 42px;
+  font-weight: 500;
+  margin: 8px 0 20px;
+}
+
+.cabinet-card p {
+  font-size: 20px;
+  margin: 8px 0;
+}
+
+.cabinet-card hr {
+  border: 0;
+  border-top: 1px solid #ddd;
+  margin: 16px 0;
+}
+
+.cabinet-hint {
+  color: #666;
+}
+
+.cabinet-error {
+  margin-bottom: 12px;
+  color: #b42318;
+}
+
+.cabinet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cabinet-list-item {
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.cabinet-list-item h4 {
+  margin-bottom: 8px;
+}
+
+.cabinet-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cabinet-mini-item {
+  font-size: 18px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 1200px) {
+  .cabinet-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cabinet-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

@@ -7,9 +7,9 @@ spring:
       name: disabled
       password: disabled
   datasource:
-    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${DB_NAME:diploma_db}
-    username: ${DB_USER:diploma_user}
-    password: ${DB_PASSWORD:diploma_password}
+    url: jdbc:postgresql://${DB_HOST:auth-db}:${DB_PORT:5432}/${DB_NAME:auth_db}
+    username: ${DB_USER:auth_user}
+    password: ${DB_PASSWORD:auth_password}
   jpa:
     hibernate:
       ddl-auto: update

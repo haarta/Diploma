@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const PATIENT_API_BASE = import.meta.env.VITE_PATIENT_API_URL || 'http://localhost:8082/api';
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -9,16 +10,22 @@ export const api = axios.create({
   },
 });
 
-// Пациенты API
+export const patientApi = axios.create({
+  baseURL: PATIENT_API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 export const patientsApi = {
-  getAll: () => api.get('/patients'),
-  getById: (id) => api.get(`/patients/${id}`),
-  create: (data) => api.post('/patients', data),
-  update: (id, data) => api.put(`/patients/${id}`, data),
-  delete: (id) => api.delete(`/patients/${id}`),
+  list: (params) => patientApi.get('/patients', { params }),
+  getAll: (params) => patientApi.get('/patients', { params }),
+  getById: (id) => patientApi.get(`/patients/${id}`),
+  create: (data) => patientApi.post('/patients', data),
+  update: (id, data) => patientApi.patch(`/patients/${id}`, data),
+  delete: (id) => patientApi.delete(`/patients/${id}`),
 };
 
-// Врачи API
 export const doctorsApi = {
   getAll: () => api.get('/doctors'),
   getById: (id) => api.get(`/doctors/${id}`),
@@ -27,7 +34,6 @@ export const doctorsApi = {
   delete: (id) => api.delete(`/doctors/${id}`),
 };
 
-// Записи API
 export const appointmentsApi = {
   getAll: () => api.get('/appointments'),
   getById: (id) => api.get(`/appointments/${id}`),

@@ -22,7 +22,7 @@ export default function Appointments() {
       try {
         const response = await appointmentsApi.getAll();
         return response.data || [];
-      } catch (err) {
+      } catch {
         return [];
       }
     },
@@ -32,9 +32,9 @@ export default function Appointments() {
     queryKey: ['patients'],
     queryFn: async () => {
       try {
-        const response = await patientsApi.getAll();
-        return response.data || [];
-      } catch (err) {
+        const response = await patientsApi.getAll({ page: 0, size: 100, active: true, sort: 'id,desc' });
+        return response.data?.content || response.data || [];
+      } catch {
         return [];
       }
     },
@@ -46,7 +46,7 @@ export default function Appointments() {
       try {
         const response = await doctorsApi.getAll();
         return response.data || [];
-      } catch (err) {
+      } catch {
         return [];
       }
     },
@@ -91,12 +91,10 @@ export default function Appointments() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     if (!formData.patientId || !formData.doctorId || !formData.appointmentDate || !formData.appointmentTime) {
-      alert('Заполните обязательные поля');
+      alert('Fill required fields');
       return;
     }
-
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: formData });
     } else {
@@ -117,12 +115,13 @@ export default function Appointments() {
 
   const getPatientName = (id) => {
     const patient = patients.find((p) => p.id == id);
-    return patient ? `${patient.firstName} ${patient.lastName}` : 'Неизвестный пациент';
+    if (!patient) return 'Unknown patient';
+    return patient.fullName || `${patient.firstName || ''} ${patient.lastName || ''}`.trim();
   };
 
   const getDoctorName = (id) => {
     const doctor = doctors.find((d) => d.id == id);
-    return doctor ? `${doctor.firstName} ${doctor.lastName}` : 'Неизвестный врач';
+    return doctor ? `${doctor.firstName} ${doctor.lastName}` : 'Unknown doctor';
   };
 
   const getStatusColor = (status) => {
@@ -142,7 +141,7 @@ export default function Appointments() {
     return (
       <div className="loading">
         <div className="spinner"></div>
-        <p>Загрузка записей...</p>
+        <p>Loading appointments...</p>
       </div>
     );
   }
@@ -150,41 +149,41 @@ export default function Appointments() {
   return (
     <div className="card">
       <div className="card-header">
-        <h2>Управление записями на приём</h2>
+        <h2>Appointments</h2>
       </div>
 
       <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-        {showForm ? '✕ Отмена' : '+ Новая запись'}
+        {showForm ? 'Cancel' : 'Add appointment'}
       </button>
 
       {showForm && (
         <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-          <h3>{editingId ? 'Редактирование записи' : 'Создать запись на приём'}</h3>
+          <h3>{editingId ? 'Edit appointment' : 'Create appointment'}</h3>
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
-                <label>Пациент *</label>
+                <label>Patient *</label>
                 <select
                   value={formData.patientId}
                   onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
                   required
                 >
-                  <option value="">Выберите пациента</option>
+                  <option value="">Select patient</option>
                   {patients.map((patient) => (
                     <option key={patient.id} value={patient.id}>
-                      {patient.firstName} {patient.lastName}
+                      {patient.fullName || `${patient.firstName || ''} ${patient.lastName || ''}`.trim()}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="form-group">
-                <label>Врач *</label>
+                <label>Doctor *</label>
                 <select
                   value={formData.doctorId}
                   onChange={(e) => setFormData({ ...formData, doctorId: e.target.value })}
                   required
                 >
-                  <option value="">Выберите врача</option>
+                  <option value="">Select doctor</option>
                   {doctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
                       {doctor.firstName} {doctor.lastName} ({doctor.specialty})
@@ -193,7 +192,7 @@ export default function Appointments() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Дата приёма *</label>
+                <label>Date *</label>
                 <input
                   type="date"
                   value={formData.appointmentDate}
@@ -202,7 +201,7 @@ export default function Appointments() {
                 />
               </div>
               <div className="form-group">
-                <label>Время приёма *</label>
+                <label>Time *</label>
                 <input
                   type="time"
                   value={formData.appointmentTime}
@@ -211,18 +210,18 @@ export default function Appointments() {
                 />
               </div>
               <div className="form-group">
-                <label>Статус</label>
+                <label>Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
-                  <option value="SCHEDULED">Запланирована</option>
-                  <option value="COMPLETED">Завершена</option>
-                  <option value="CANCELLED">Отменена</option>
+                  <option value="SCHEDULED">Scheduled</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Примечания</label>
+                <label>Notes</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -232,10 +231,10 @@ export default function Appointments() {
             </div>
             <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-success">
-                {editingId ? 'Сохранить' : 'Создать'}
+                {editingId ? 'Save' : 'Create'}
               </button>
               <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                Отмена
+                Cancel
               </button>
             </div>
           </form>
@@ -244,19 +243,19 @@ export default function Appointments() {
 
       {appointments.length === 0 ? (
         <div className="empty-state">
-          <h3>Нет записей</h3>
-          <p>Нажмите кнопку выше, чтобы создать запись на приём</p>
+          <h3>No appointments</h3>
+          <p>Create your first appointment.</p>
         </div>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Пациент</th>
-              <th>Врач</th>
-              <th>Дата</th>
-              <th>Время</th>
-              <th>Статус</th>
-              <th>Действия</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -277,27 +276,23 @@ export default function Appointments() {
                       fontWeight: 'bold',
                     }}
                   >
-                    {appointment.status === 'SCHEDULED'
-                      ? 'Запланирована'
-                      : appointment.status === 'COMPLETED'
-                        ? 'Завершена'
-                        : 'Отменена'}
+                    {appointment.status}
                   </span>
                 </td>
                 <td>
                   <button className="btn btn-secondary btn-small" onClick={() => handleEdit(appointment)}>
-                    Редакт.
+                    Edit
                   </button>
                   <button
                     className="btn btn-danger btn-small"
                     onClick={() => {
-                      if (window.confirm('Удалить запись?')) {
+                      if (window.confirm('Delete appointment?')) {
                         deleteMutation.mutate(appointment.id);
                       }
                     }}
                     style={{ marginLeft: '5px' }}
                   >
-                    Удалить
+                    Delete
                   </button>
                 </td>
               </tr>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/AuthModal.css';
 
 const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
@@ -31,6 +32,8 @@ const clearTokens = () => {
 };
 
 const AuthModal = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
@@ -86,6 +89,20 @@ const AuthModal = () => {
         initSession();
     }, []);
 
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const authMode = params.get('auth');
+        if (authMode === 'register') {
+            setIsLogin(false);
+            setIsOpen(true);
+            setErrorMessage('');
+        } else if (authMode === 'login') {
+            setIsLogin(true);
+            setIsOpen(true);
+            setErrorMessage('');
+        }
+    }, [location.search]);
+
     const toggleModal = () => {
         setErrorMessage('');
         setIsOpen(!isOpen);
@@ -119,6 +136,7 @@ const AuthModal = () => {
             setIsOpen(false);
             setEmail('');
             setPassword('');
+            navigate('/cabinet');
         } catch (error) {
             setErrorMessage(getErrorMessage(error));
         } finally {
@@ -143,6 +161,7 @@ const AuthModal = () => {
             setIsOpen(false);
             setEmail('');
             setPassword('');
+            navigate('/cabinet');
         } catch (error) {
             setErrorMessage(getErrorMessage(error));
         } finally {
@@ -185,7 +204,7 @@ const AuthModal = () => {
                         <span className="user-name">{profileName}</span>
                         <button
                             className="auth-icon-btn"
-                            onClick={toggleModal}
+                            onClick={() => navigate('/cabinet')}
                             title="Profile"
                         >
                             <svg
