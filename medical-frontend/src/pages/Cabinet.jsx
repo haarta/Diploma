@@ -10,59 +10,60 @@ const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
 export default function Cabinet() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [profile, setProfile] = useState(null);
   const [patient, setPatient] = useState(null);
   const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const logout = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
-    navigate('/?auth=register', { replace: true });
+    navigate('/?auth=register');
   };
 
   const loadCabinet = async () => {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!token) {
-      navigate('/', { replace: true });
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+
+    if (!accessToken) {
+      logout();
       return;
     }
 
     setLoading(true);
     setError('');
 
+    let meResponse;
     try {
-      const meResp = await axios.get(`${AUTH_API_BASE}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+      meResponse = await axios.get(`${AUTH_API_BASE}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setProfile(meResp.data);
-
-      let patientData = null;
-      try {
-        const patientResp = await axios.get(`${PATIENT_API_BASE}/patients/by-user/${meResp.data.userId}`);
-        patientData = patientResp.data;
-        setPatient(patientData);
-      } catch {
-        setPatient(null);
-      }
-
-      try {
-        const appointmentsResp = await appointmentsApi.getAll();
-        const all = appointmentsResp.data || [];
-        if (patientData?.id) {
-          setAppointments(all.filter((a) => String(a.patientId) === String(patientData.id)));
-        } else {
-          setAppointments([]);
-        }
-      } catch {
-        setAppointments([]);
-      }
     } catch {
-      setError('Session expired. Please sign in again.');
+      setError('Сессия истекла. Выполните вход заново.');
       logout();
+      return;
+    }
+
+    setProfile(meResponse.data);
+
+    let patientData = null;
+    try {
+      const patientResponse = await axios.get(`${PATIENT_API_BASE}/patients/by-user/${meResponse.data.userId}`);
+      patientData = patientResponse.data;
+      setPatient(patientData);
+    } catch {
+      setPatient(null);
+    }
+
+    try {
+      const appointmentsResponse = await appointmentsApi.getAll();
+      const allAppointments = appointmentsResponse.data || [];
+      setAppointments(patientData ? allAppointments.filter((item) => item.patientId === patientData.id) : []);
+    } catch {
+      setAppointments([]);
+      setError('Не удалось загрузить записи пациента.');
     } finally {
       setLoading(false);
     }
@@ -72,175 +73,168 @@ export default function Cabinet() {
     loadCabinet();
   }, []);
 
-  const analysisItems = useMemo(() => {
-    return [
-      { id: 1, name: 'Общий анализ крови', date: '2026-03-01', status: 'Готов' },
-      { id: 2, name: 'Биохимия крови', date: '2026-02-25', status: 'В обработке' },
-      { id: 3, name: 'ТТГ', date: '2026-02-10', status: 'Готов' },
-    ];
-  }, []);
+  const servicesItems = useMemo(
+    () =>
+      appointments.map((item) => ({
+        id: item.id,
+        title: `Запись на ${item.appointmentDate || 'дату без уточнения'}`,
+        subtitle: item.notes || 'Медицинская услуга без дополнительного комментария',
+        status: item.status,
+        time: item.appointmentTime || '—',
+      })),
+    [appointments]
+  );
 
-  const servicesItems = useMemo(() => {
-    return appointments.map((a) => ({
-      id: a.id,
-      title: 'Запись на прием',
-      date: a.appointmentDate,
-      time: a.appointmentTime,
-      status: a.status,
-      notes: a.notes || '-',
-    }));
-  }, [appointments]);
+  const visitsItems = useMemo(
+    () =>
+      appointments
+        .filter((item) => item.status === 'COMPLETED')
+        .map((item) => ({
+          id: item.id,
+          title: `Прием ${item.appointmentDate || 'без даты'}`,
+          subtitle: item.notes || 'Посещение врача',
+          time: item.appointmentTime || '—',
+        })),
+    [appointments]
+  );
 
-  const visitsItems = useMemo(() => {
-    return appointments
-      .filter((a) => a.status === 'COMPLETED')
-      .map((a) => ({
-        id: a.id,
-        date: a.appointmentDate,
-        time: a.appointmentTime,
-        notes: a.notes || '-',
-      }));
-  }, [appointments]);
+  const analysisItems = [
+    { id: 1, title: 'Общий анализ крови', result: 'Без отклонений', date: '2026-03-05' },
+    { id: 2, title: 'Биохимический анализ', result: 'Требуется консультация врача', date: '2026-02-19' },
+    { id: 3, title: 'Анализ мочи', result: 'Показатели в норме', date: '2026-01-28' },
+  ];
 
   const renderContent = () => {
-    if (location.pathname.endsWith('/info')) {
+    if (loading) {
       return (
-        <section className="cabinet-card">
-          <h2>{patient?.fullName || profile?.email || 'Профиль'}</h2>
-          <p>Роль: {profile?.role || '-'}</p>
-          <p>User ID: {profile?.userId || '-'}</p>
-          <hr />
-          <p>Телефон: {patient?.phone || '-'}</p>
-          <p>Email: {patient?.email || profile?.email || '-'}</p>
-          <p>Дата рождения: {patient?.birthDate || '-'}</p>
-          <p>Адрес: {patient?.address || '-'}</p>
-          {!patient && <p className="cabinet-hint">Карточка пациента пока не создана.</p>}
-        </section>
+        <div className="cabinet-card">
+          <p>Загрузка профиля...</p>
+        </div>
       );
     }
 
-    if (location.pathname.endsWith('/services')) {
+    if (location.pathname === '/cabinet/info') {
       return (
-        <section className="cabinet-card">
+        <div className="cabinet-card">
+          <h2>Общая информация</h2>
+          <h3>{patient?.fullName || 'Профиль'}</h3>
+          <p><strong>Идентификатор пользователя:</strong> {profile?.userId || '—'}</p>
+          <p><strong>Электронная почта:</strong> {profile?.email || '—'}</p>
+          <p><strong>Роль:</strong> {profile?.role || '—'}</p>
+          <hr />
+          <p><strong>Телефон:</strong> {patient?.phone || 'не указан'}</p>
+          <p><strong>Дата рождения:</strong> {patient?.birthDate || 'не указана'}</p>
+          <p><strong>Адрес:</strong> {patient?.address || 'не указан'}</p>
+          {!patient ? <p className="cabinet-hint">Карточка пациента пока не создана.</p> : null}
+        </div>
+      );
+    }
+
+    if (location.pathname === '/cabinet/services') {
+      return (
+        <div className="cabinet-card">
           <h2>Мои записи и услуги</h2>
-          {servicesItems.length === 0 ? (
-            <p>Пока нет записей и услуг.</p>
-          ) : (
-            <div className="cabinet-list">
-              {servicesItems.map((item) => (
+          <div className="cabinet-list">
+            {servicesItems.length === 0 ? (
+              <p className="cabinet-hint">У вас пока нет активных записей.</p>
+            ) : (
+              servicesItems.map((item) => (
                 <div className="cabinet-list-item" key={item.id}>
                   <h4>{item.title}</h4>
-                  <p>Дата: {item.date || '-'}</p>
-                  <p>Время: {item.time || '-'}</p>
-                  <p>Статус: {item.status || '-'}</p>
-                  <p>Комментарий: {item.notes}</p>
+                  <p>{item.subtitle}</p>
+                  <p><strong>Время:</strong> {item.time}</p>
+                  <p><strong>Статус:</strong> {item.status}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </div>
+        </div>
       );
     }
 
-    if (location.pathname.endsWith('/visits')) {
+    if (location.pathname === '/cabinet/visits') {
       return (
-        <section className="cabinet-card">
+        <div className="cabinet-card">
           <h2>Мои приемы</h2>
-          {visitsItems.length === 0 ? (
-            <p>Завершенных приемов пока нет.</p>
-          ) : (
-            <div className="cabinet-list">
-              {visitsItems.map((item) => (
+          <div className="cabinet-list">
+            {visitsItems.length === 0 ? (
+              <p className="cabinet-hint">Завершенных приемов пока нет.</p>
+            ) : (
+              visitsItems.map((item) => (
                 <div className="cabinet-list-item" key={item.id}>
-                  <h4>Посещение врача</h4>
-                  <p>Дата: {item.date || '-'}</p>
-                  <p>Время: {item.time || '-'}</p>
-                  <p>Комментарий: {item.notes}</p>
+                  <h4>{item.title}</h4>
+                  <p>{item.subtitle}</p>
+                  <p><strong>Время:</strong> {item.time}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </div>
+        </div>
       );
     }
 
-    if (location.pathname.endsWith('/labs')) {
+    if (location.pathname === '/cabinet/labs') {
       return (
-        <section className="cabinet-card">
+        <div className="cabinet-card">
           <h2>Результаты анализов</h2>
-          {analysisItems.length === 0 ? (
-            <p>Результатов анализов пока нет.</p>
-          ) : (
-            <div className="cabinet-list">
-              {analysisItems.map((item) => (
-                <div className="cabinet-list-item" key={item.id}>
-                  <h4>{item.name}</h4>
-                  <p>Дата: {item.date}</p>
-                  <p>Статус: {item.status}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+          <div className="cabinet-list">
+            {analysisItems.map((item) => (
+              <div className="cabinet-list-item" key={item.id}>
+                <h4>{item.title}</h4>
+                <p><strong>Дата:</strong> {item.date}</p>
+                <p><strong>Результат:</strong> {item.result}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       );
     }
 
     return <Navigate to="/cabinet/info" replace />;
   };
 
-  if (loading) {
-    return (
-      <div className="cabinet-page">
-        <div className="cabinet-card">Loading profile...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="cabinet-page">
+    <section className="cabinet-page">
       <div className="cabinet-top">
-        <h1>Личный кабинет</h1>
+        <div>
+          <h1>Личный кабинет</h1>
+          {error ? <p className="cabinet-error">{error}</p> : null}
+        </div>
         <div className="cabinet-actions">
-          <button className="cabinet-refresh" onClick={loadCabinet}>Обновить</button>
-          <button className="cabinet-logout" onClick={logout}>Выйти</button>
+          <button className="cabinet-refresh" type="button" onClick={loadCabinet}>
+            Обновить
+          </button>
+          <button className="cabinet-logout" type="button" onClick={logout}>
+            Выйти
+          </button>
         </div>
       </div>
 
-      {error && <div className="cabinet-error">{error}</div>}
-
       <div className="cabinet-layout">
         <aside className="cabinet-menu">
-          <NavLink to="/cabinet/info" className={({ isActive }) => `cabinet-menu-item ${isActive ? 'active' : ''}`}>
-            Общая информация
-          </NavLink>
-          <NavLink to="/cabinet/services" className={({ isActive }) => `cabinet-menu-item ${isActive ? 'active' : ''}`}>
-            Мои записи и услуги
-          </NavLink>
-          <NavLink to="/cabinet/visits" className={({ isActive }) => `cabinet-menu-item ${isActive ? 'active' : ''}`}>
-            Мои приемы
-          </NavLink>
-          <NavLink to="/cabinet/labs" className={({ isActive }) => `cabinet-menu-item ${isActive ? 'active' : ''}`}>
-            Результаты анализов
-          </NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/info">Общая информация</NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/services">Мои записи и услуги</NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/visits">Мои приемы</NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/labs">Результаты анализов</NavLink>
         </aside>
 
         {renderContent()}
 
-        <section className="cabinet-card side">
-          <h3>Предстоящие услуги</h3>
-          {servicesItems.length === 0 ? (
-            <p>Нет активных записей.</p>
-          ) : (
-            <div className="cabinet-mini-list">
-              {servicesItems.slice(0, 3).map((item) => (
-                <div key={item.id} className="cabinet-mini-item">
-                  <strong>{item.date || '-'}</strong> {item.time || '-'}
+        <aside className="cabinet-card">
+          <h2>Предстоящие услуги</h2>
+          <div className="cabinet-mini-list">
+            {servicesItems.length === 0 ? (
+              <p className="cabinet-hint">Пока нет ближайших услуг.</p>
+            ) : (
+              servicesItems.slice(0, 4).map((item) => (
+                <div className="cabinet-mini-item" key={item.id}>
+                  {item.title} в {item.time}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </div>
+        </aside>
       </div>
-    </div>
+    </section>
   );
 }

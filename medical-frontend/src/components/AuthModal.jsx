@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/AuthModal.css';
@@ -8,307 +8,289 @@ const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 
 const authApi = axios.create({
-    baseURL: AUTH_API_BASE,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: AUTH_API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-const getErrorMessage = (error) => {
-    const backendMessage = error?.response?.data?.error;
-    if (backendMessage) return backendMessage;
-    if (error?.response?.status) return `Request failed (${error.response.status})`;
-    return 'Network error';
-};
+function extractErrorMessage(error) {
+  const apiMessage = error.response?.data?.message || error.response?.data?.error;
+  if (apiMessage) {
+    return apiMessage;
+  }
 
-const saveTokens = (tokens) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-};
+  if (error.response?.status) {
+    return `Ошибка запроса (${error.response.status})`;
+  }
 
-const clearTokens = () => {
+  return 'Ошибка сети';
+}
+
+export default function AuthModal() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+  const [mode, setMode] = useState('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [user, setUser] = useState(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+
+  const hasSession = Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+
+  const saveTokens = (payload) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
+  };
+
+  const clearSession = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
-};
+    setUser(null);
+  };
 
-const AuthModal = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const [isOpen, setIsOpen] = useState(false);
-    const [isLogin, setIsLogin] = useState(true);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [initializing, setInitializing] = useState(true);
-    const [errorMessage, setErrorMessage] = useState('');
-    const [user, setUser] = useState(null);
+  const goToCabinet = () => {
+    setIsOpen(false);
+    navigate('/cabinet/info');
+  };
 
-    const loadCurrentUser = async (accessToken) => {
-        const response = await authApi.get('/api/auth/me', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        return response.data;
-    };
+  const fetchMe = async (token) => {
+    const response = await authApi.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  };
 
-    useEffect(() => {
-        const initSession = async () => {
-            const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-            const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshSession = async () => {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      return null;
+    }
 
-            if (!accessToken) {
-                setInitializing(false);
-                return;
-            }
+    const response = await authApi.post('/api/auth/refresh', { refreshToken });
+    saveTokens(response.data);
+    return fetchMe(response.data.accessToken);
+  };
 
-            try {
-                const me = await loadCurrentUser(accessToken);
-                setUser(me);
-            } catch {
-                if (!refreshToken) {
-                    clearTokens();
-                    setUser(null);
-                    setInitializing(false);
-                    return;
-                }
+  useEffect(() => {
+    const authParam = new URLSearchParams(location.search).get('auth');
 
-                try {
-                    const refreshResponse = await authApi.post('/api/auth/refresh', { refreshToken });
-                    saveTokens(refreshResponse.data);
-                    const me = await loadCurrentUser(refreshResponse.data.accessToken);
-                    setUser(me);
-                } catch {
-                    clearTokens();
-                    setUser(null);
-                }
-            } finally {
-                setInitializing(false);
-            }
-        };
+    if (authParam === 'register') {
+      setMode('register');
+      setIsOpen(true);
+    } else if (authParam === 'login') {
+      setMode('login');
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [location.search]);
 
-        initSession();
-    }, []);
+  useEffect(() => {
+    const restoreSession = async () => {
+      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return;
+      }
 
-    useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const authMode = params.get('auth');
-        if (authMode === 'register') {
-            setIsLogin(false);
-            setIsOpen(true);
-            setErrorMessage('');
-        } else if (authMode === 'login') {
-            setIsLogin(true);
-            setIsOpen(true);
-            setErrorMessage('');
-        }
-    }, [location.search]);
-
-    const toggleModal = () => {
-        setErrorMessage('');
-        setIsOpen(!isOpen);
-    };
-
-    const togglePasswordVisibility = () => {
-        setShowPassword(!showPassword);
-    };
-
-    const switchMode = () => {
-        setIsLogin(!isLogin);
-        setErrorMessage('');
-        setEmail('');
-        setPassword('');
-    };
-
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        if (!email || !password) {
-            setErrorMessage('Fill in all fields');
-            return;
-        }
-
-        setLoading(true);
-        setErrorMessage('');
+      try {
+        const me = await fetchMe(accessToken);
+        setUser(me);
+      } catch {
         try {
-            const loginResponse = await authApi.post('/api/auth/login', { email, password });
-            saveTokens(loginResponse.data);
-            const me = await loadCurrentUser(loginResponse.data.accessToken);
-            setUser(me);
-            setIsOpen(false);
-            setEmail('');
-            setPassword('');
-            navigate('/cabinet');
-        } catch (error) {
-            setErrorMessage(getErrorMessage(error));
-        } finally {
-            setLoading(false);
+          const me = await refreshSession();
+          setUser(me);
+        } catch {
+          clearSession();
         }
+      }
     };
 
-    const handleRegister = async (e) => {
-        e.preventDefault();
-        if (!email || !password) {
-            setErrorMessage('Fill in all fields');
-            return;
-        }
+    restoreSession();
+  }, []);
 
-        setLoading(true);
-        setErrorMessage('');
-        try {
-            const registerResponse = await authApi.post('/api/auth/register', { email, password });
-            saveTokens(registerResponse.data);
-            const me = await loadCurrentUser(registerResponse.data.accessToken);
-            setUser(me);
-            setIsOpen(false);
-            setEmail('');
-            setPassword('');
-            navigate('/cabinet');
-        } catch (error) {
-            setErrorMessage(getErrorMessage(error));
-        } finally {
-            setLoading(false);
-        }
-    };
+  const closeModal = () => {
+    setIsOpen(false);
+    setError('');
+    setShowPassword(false);
+    navigate(location.pathname, { replace: true });
+  };
 
-    const handleLogout = () => {
-        clearTokens();
-        setUser(null);
-        setEmail('');
-        setPassword('');
-        setErrorMessage('');
-    };
+  const openModal = (nextMode) => {
+    if (localStorage.getItem(ACCESS_TOKEN_KEY)) {
+      goToCabinet();
+      return;
+    }
 
-    const profileName = user?.email || 'Profile';
+    setMode(nextMode);
+    setError('');
+    setIsOpen(true);
+    navigate(`/?auth=${nextMode}`, { replace: true });
+  };
 
-    return (
-        <>
-            <div className="auth-button">
-                {!user ? (
-                    <button
-                        className="auth-icon-btn"
-                        onClick={toggleModal}
-                        title="Authorization"
-                        disabled={initializing}
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                        >
-                            <circle cx="12" cy="8" r="4"/>
-                            <path d="M 12 14 C 7 14 2 16.5 2 19 V 22 H 22 V 19 C 22 16.5 17 14 12 14"/>
-                        </svg>
-                    </button>
-                ) : (
-                    <div className="user-profile">
-                        <span className="user-name">{profileName}</span>
-                        <button
-                            className="auth-icon-btn"
-                            onClick={() => navigate('/cabinet')}
-                            title="Profile"
-                        >
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                            >
-                                <circle cx="12" cy="8" r="4"/>
-                                <path d="M 12 14 C 7 14 2 16.5 2 19 V 22 H 22 V 19 C 22 16.5 17 14 12 14"/>
-                            </svg>
-                        </button>
-                    </div>
-                )}
-            </div>
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-            <div className={`auth-modal ${isOpen ? 'active' : ''}`} onClick={toggleModal}>
-                <div className="auth-modal-content" onClick={(e) => e.stopPropagation()}>
-                    <button className="auth-modal-close" onClick={toggleModal}>x</button>
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
 
-                    {!user ? (
-                        <>
-                            <h2 className="auth-modal-title">{isLogin ? 'Login' : 'Register'}</h2>
+    if (!formData.email.trim() || !formData.password.trim()) {
+      setError('Заполните все поля');
+      return;
+    }
 
-                            <form onSubmit={isLogin ? handleLogin : handleRegister} className="auth-form">
-                                <div className="form-group">
-                                    <label htmlFor="email">Email</label>
-                                    <input
-                                        id="email"
-                                        type="email"
-                                        placeholder="name@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="form-control"
-                                        disabled={loading}
-                                    />
-                                </div>
+    setLoading(true);
 
-                                <div className="form-group">
-                                    <label htmlFor="password">Password</label>
-                                    <div className="password-input-wrapper">
-                                        <input
-                                            id="password"
-                                            type={showPassword ? 'text' : 'password'}
-                                            placeholder="********"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="form-control"
-                                            disabled={loading}
-                                        />
-                                        <button
-                                            type="button"
-                                            className="password-toggle"
-                                            onClick={togglePasswordVisibility}
-                                            disabled={loading}
-                                            aria-label="Toggle password visibility"
-                                        >
-                                            {showPassword ? 'Hide' : 'Show'}
-                                        </button>
-                                    </div>
-                                </div>
+    try {
+      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const response = await authApi.post(endpoint, {
+        email: formData.email.trim(),
+        password: formData.password,
+      });
 
-                                {errorMessage && <p className="error-text">{errorMessage}</p>}
+      saveTokens(response.data);
+      const me = await fetchMe(response.data.accessToken);
+      setUser(me);
+      setFormData({ email: '', password: '' });
+      goToCabinet();
+    } catch (requestError) {
+      setError(extractErrorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary btn-login"
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Loading...' : (isLogin ? 'Sign in' : 'Create account')}
-                                </button>
-                            </form>
+  const handleLogout = () => {
+    clearSession();
+    closeModal();
+    navigate('/?auth=register');
+  };
 
-                            <div className="auth-toggle">
-                                <p>
-                                    {isLogin ? 'No account?' : 'Already have an account?'}
-                                    <button
-                                        type="button"
-                                        className="auth-toggle-btn"
-                                        onClick={switchMode}
-                                        disabled={loading}
-                                    >
-                                        {isLogin ? 'Register' : 'Login'}
-                                    </button>
-                                </p>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <h2 className="auth-modal-title">My profile</h2>
-                            <div className="user-info">
-                                <p><strong>Email:</strong> {user.email}</p>
-                                <p><strong>Role:</strong> {user.role}</p>
-                                <p><strong>User ID:</strong> {user.userId}</p>
-                            </div>
-                            <button onClick={handleLogout} className="btn btn-danger btn-logout">
-                                Logout
-                            </button>
-                        </>
-                    )}
+  return (
+    <div className="auth-button">
+      {hasSession ? (
+        <div className="user-profile">
+          <button
+            className="auth-icon-btn"
+            type="button"
+            aria-label="Открыть личный кабинет"
+            onClick={goToCabinet}
+          >
+            👤
+          </button>
+          <span className="user-name">{user?.email || 'Личный кабинет'}</span>
+        </div>
+      ) : (
+        <button
+          className="auth-icon-btn"
+          type="button"
+          aria-label="Открыть авторизацию"
+          onClick={() => openModal('login')}
+        >
+          👤
+        </button>
+      )}
+
+      <div className={`auth-modal ${isOpen ? 'active' : ''}`} onClick={closeModal}>
+        <div className="auth-modal-content" onClick={(event) => event.stopPropagation()}>
+          <button className="auth-modal-close" type="button" onClick={closeModal} aria-label="Закрыть">
+            ×
+          </button>
+
+          {hasSession && user ? (
+            <>
+              <h2 className="auth-modal-title">Профиль</h2>
+              <div className="user-info">
+                <p><strong>Электронная почта:</strong> {user.email}</p>
+                <p><strong>Роль:</strong> {user.role}</p>
+                <p><strong>Идентификатор пользователя:</strong> {user.userId}</p>
+              </div>
+              <button type="button" className="btn btn-secondary btn-logout" onClick={goToCabinet}>
+                Личный кабинет
+              </button>
+              <button type="button" className="btn btn-danger btn-logout" onClick={handleLogout}>
+                Выйти
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="auth-modal-title">{mode === 'login' ? 'Вход' : 'Регистрация'}</h2>
+
+              <form className="auth-form" onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label htmlFor="email">Электронная почта</label>
+                  <input
+                    id="email"
+                    className="form-control"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Введите электронную почту"
+                    autoComplete="email"
+                  />
                 </div>
-            </div>
-        </>
-    );
-};
 
-export default AuthModal;
+                <div className="form-group">
+                  <label htmlFor="password">Пароль</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      id="password"
+                      className="form-control"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Введите пароль"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    />
+                    <button
+                      className="password-toggle"
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      disabled={loading}
+                    >
+                      {showPassword ? 'Скрыть' : 'Показать'}
+                    </button>
+                  </div>
+                </div>
+
+                {error ? <p className="error-text">{error}</p> : null}
+
+                <button type="submit" className="btn btn-primary btn-login" disabled={loading}>
+                  {loading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+                </button>
+              </form>
+
+              <div className="auth-toggle">
+                {mode === 'login' ? (
+                  <p>
+                    Нет аккаунта?
+                    <button type="button" className="auth-toggle-btn" onClick={() => setMode('register')}>
+                      Зарегистрироваться
+                    </button>
+                  </p>
+                ) : (
+                  <p>
+                    Уже есть аккаунт?
+                    <button type="button" className="auth-toggle-btn" onClick={() => setMode('login')}>
+                      Войти
+                    </button>
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

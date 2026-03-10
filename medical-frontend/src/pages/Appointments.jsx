@@ -1,72 +1,71 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { appointmentsApi, patientsApi, doctorsApi } from '../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { appointmentsApi, doctorsApi, patientsApi } from '../api';
+
+const initialFormData = {
+  patientId: '',
+  doctorId: '',
+  appointmentDate: '',
+  appointmentTime: '',
+  status: 'SCHEDULED',
+  notes: '',
+};
+
+const statusLabels = {
+  SCHEDULED: 'Запланирован',
+  COMPLETED: 'Завершен',
+  CANCELLED: 'Отменен',
+};
+
+const statusClasses = {
+  SCHEDULED: 'status status--warning',
+  COMPLETED: 'status status--success',
+  CANCELLED: 'status status--error',
+};
 
 export default function Appointments() {
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
-    patientId: '',
-    doctorId: '',
-    appointmentDate: '',
-    appointmentTime: '',
-    status: 'SCHEDULED',
-    notes: '',
-  });
+  const [formData, setFormData] = useState(initialFormData);
 
-  const queryClient = useQueryClient();
-
-  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
+  const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: async () => {
-      try {
-        const response = await appointmentsApi.getAll();
-        return response.data || [];
-      } catch {
-        return [];
-      }
+      const response = await appointmentsApi.getAll();
+      return response.data || [];
     },
   });
 
   const { data: patients = [] } = useQuery({
-    queryKey: ['patients'],
+    queryKey: ['patients-for-appointments'],
     queryFn: async () => {
-      try {
-        const response = await patientsApi.getAll({ page: 0, size: 100, active: true, sort: 'id,desc' });
-        return response.data?.content || response.data || [];
-      } catch {
-        return [];
-      }
+      const response = await patientsApi.getAll({ page: 0, size: 100, active: true, sort: 'id,desc' });
+      return response.data?.content || response.data || [];
     },
   });
 
   const { data: doctors = [] } = useQuery({
-    queryKey: ['doctors'],
+    queryKey: ['doctors-for-appointments'],
     queryFn: async () => {
-      try {
-        const response = await doctorsApi.getAll();
-        return response.data || [];
-      } catch {
-        return [];
-      }
+      const response = await doctorsApi.getAll();
+      return response.data || [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => appointmentsApi.create(data),
+    mutationFn: (payload) => appointmentsApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       resetForm();
-      setShowForm(false);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => appointmentsApi.update(id, data),
+    mutationFn: ({ id, payload }) => appointmentsApi.update(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
       resetForm();
-      setShowForm(false);
     },
   });
 
@@ -78,227 +77,195 @@ export default function Appointments() {
   });
 
   const resetForm = () => {
-    setFormData({
-      patientId: '',
-      doctorId: '',
-      appointmentDate: '',
-      appointmentTime: '',
-      status: 'SCHEDULED',
-      notes: '',
-    });
+    setShowForm(false);
     setEditingId(null);
+    setFormData(initialFormData);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const getPatientName = (patientId) => {
+    const patient = patients.find((item) => String(item.id) === String(patientId));
+    return patient?.fullName || 'Неизвестный пациент';
+  };
+
+  const getDoctorName = (doctorId) => {
+    const doctor = doctors.find((item) => String(item.id) === String(doctorId));
+    if (!doctor) {
+      return 'Неизвестный врач';
+    }
+    return [doctor.lastName, doctor.firstName].filter(Boolean).join(' ');
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
     if (!formData.patientId || !formData.doctorId || !formData.appointmentDate || !formData.appointmentTime) {
-      alert('Fill required fields');
+      window.alert('Заполните обязательные поля');
       return;
     }
+
+    const payload = {
+      ...formData,
+      patientId: Number(formData.patientId),
+      doctorId: Number(formData.doctorId),
+    };
+
     if (editingId) {
-      updateMutation.mutate({ id: editingId, data: formData });
-    } else {
-      createMutation.mutate(formData);
+      updateMutation.mutate({ id: editingId, payload });
+      return;
     }
+
+    createMutation.mutate(payload);
   };
 
   const handleEdit = (appointment) => {
-    setFormData(appointment);
     setEditingId(appointment.id);
+    setFormData({
+      patientId: String(appointment.patientId ?? ''),
+      doctorId: String(appointment.doctorId ?? ''),
+      appointmentDate: appointment.appointmentDate || '',
+      appointmentTime: appointment.appointmentTime || '',
+      status: appointment.status || 'SCHEDULED',
+      notes: appointment.notes || '',
+    });
     setShowForm(true);
   };
 
-  const handleCancel = () => {
-    resetForm();
-    setShowForm(false);
-  };
-
-  const getPatientName = (id) => {
-    const patient = patients.find((p) => p.id == id);
-    if (!patient) return 'Unknown patient';
-    return patient.fullName || `${patient.firstName || ''} ${patient.lastName || ''}`.trim();
-  };
-
-  const getDoctorName = (id) => {
-    const doctor = doctors.find((d) => d.id == id);
-    return doctor ? `${doctor.firstName} ${doctor.lastName}` : 'Unknown doctor';
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'SCHEDULED':
-        return '#0066cc';
-      case 'COMPLETED':
-        return '#28a745';
-      case 'CANCELLED':
-        return '#dc3545';
-      default:
-        return '#666';
+  const handleDelete = (id) => {
+    if (window.confirm('Удалить запись?')) {
+      deleteMutation.mutate(id);
     }
   };
 
-  if (appointmentsLoading) {
-    return (
-      <div className="loading">
-        <div className="spinner"></div>
-        <p>Loading appointments...</p>
-      </div>
-    );
+  if (isLoading) {
+    return <div className="loading">Загрузка записей...</div>;
   }
 
   return (
     <div className="card">
-      <div className="card-header">
-        <h2>Appointments</h2>
+      <div className="card-header page-toolbar">
+        <h2>Записи</h2>
+        <div className="page-toolbar-actions">
+          {showForm ? (
+            <button className="btn btn-secondary" type="button" onClick={resetForm}>
+              Отмена
+            </button>
+          ) : null}
+          <button className="btn btn-primary" type="button" onClick={() => setShowForm(true)}>
+            Добавить запись
+          </button>
+        </div>
       </div>
 
-      <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-        {showForm ? 'Cancel' : 'Add appointment'}
-      </button>
+      {showForm ? (
+        <form className="page-form" onSubmit={handleSubmit}>
+          <div className="modal-header">
+            <h2>{editingId ? 'Редактирование записи' : 'Создание записи'}</h2>
+          </div>
 
-      {showForm && (
-        <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-          <h3>{editingId ? 'Edit appointment' : 'Create appointment'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="form-group">
-                <label>Patient *</label>
-                <select
-                  value={formData.patientId}
-                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-                  required
-                >
-                  <option value="">Select patient</option>
-                  {patients.map((patient) => (
-                    <option key={patient.id} value={patient.id}>
-                      {patient.fullName || `${patient.firstName || ''} ${patient.lastName || ''}`.trim()}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Doctor *</label>
-                <select
-                  value={formData.doctorId}
-                  onChange={(e) => setFormData({ ...formData, doctorId: e.target.value })}
-                  required
-                >
-                  <option value="">Select doctor</option>
-                  {doctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.firstName} {doctor.lastName} ({doctor.specialty})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Date *</label>
-                <input
-                  type="date"
-                  value={formData.appointmentDate}
-                  onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Time *</label>
-                <input
-                  type="time"
-                  value={formData.appointmentTime}
-                  onChange={(e) => setFormData({ ...formData, appointmentTime: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                >
-                  <option value="SCHEDULED">Scheduled</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows="2"
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-success">
-                {editingId ? 'Save' : 'Create'}
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          <div className="form-group">
+            <label htmlFor="patientId">Пациент *</label>
+            <select id="patientId" className="form-control" name="patientId" value={formData.patientId} onChange={handleChange}>
+              <option value="">Выберите пациента</option>
+              {patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="doctorId">Врач *</label>
+            <select id="doctorId" className="form-control" name="doctorId" value={formData.doctorId} onChange={handleChange}>
+              <option value="">Выберите врача</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {[doctor.lastName, doctor.firstName, doctor.specialty].filter(Boolean).join(' ')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="appointmentDate">Дата *</label>
+            <input id="appointmentDate" className="form-control" name="appointmentDate" type="date" value={formData.appointmentDate} onChange={handleChange} />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="appointmentTime">Время *</label>
+            <input id="appointmentTime" className="form-control" name="appointmentTime" type="time" value={formData.appointmentTime} onChange={handleChange} />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status">Статус</label>
+            <select id="status" className="form-control" name="status" value={formData.status} onChange={handleChange}>
+              <option value="SCHEDULED">Запланирован</option>
+              <option value="COMPLETED">Завершен</option>
+              <option value="CANCELLED">Отменен</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="notes">Комментарий</label>
+            <textarea id="notes" className="form-control" name="notes" rows="3" value={formData.notes} onChange={handleChange} />
+          </div>
+
+          <button className="btn btn-success" type="submit">
+            {editingId ? 'Сохранить' : 'Создать'}
+          </button>
+        </form>
+      ) : null}
 
       {appointments.length === 0 ? (
         <div className="empty-state">
-          <h3>No appointments</h3>
-          <p>Create your first appointment.</p>
+          <h3>Нет записей</h3>
+          <p>Создайте первую запись на прием или услугу.</p>
         </div>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Patient</th>
-              <th>Doctor</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {appointments.map((appointment) => (
-              <tr key={appointment.id}>
-                <td>{getPatientName(appointment.patientId)}</td>
-                <td>{getDoctorName(appointment.doctorId)}</td>
-                <td>{appointment.appointmentDate}</td>
-                <td>{appointment.appointmentTime}</td>
-                <td>
-                  <span
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: getStatusColor(appointment.status),
-                      color: 'white',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {appointment.status}
-                  </span>
-                </td>
-                <td>
-                  <button className="btn btn-secondary btn-small" onClick={() => handleEdit(appointment)}>
-                    Edit
-                  </button>
-                  <button
-                    className="btn btn-danger btn-small"
-                    onClick={() => {
-                      if (window.confirm('Delete appointment?')) {
-                        deleteMutation.mutate(appointment.id);
-                      }
-                    }}
-                    style={{ marginLeft: '5px' }}
-                  >
-                    Delete
-                  </button>
-                </td>
+        <div className="page-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Пациент</th>
+                <th>Врач</th>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Статус</th>
+                <th>Действия</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {appointments.map((appointment) => (
+                <tr key={appointment.id}>
+                  <td>{getPatientName(appointment.patientId)}</td>
+                  <td>{getDoctorName(appointment.doctorId)}</td>
+                  <td>{appointment.appointmentDate || '—'}</td>
+                  <td>{appointment.appointmentTime || '—'}</td>
+                  <td>
+                    <span className={statusClasses[appointment.status] || 'status status--info'}>
+                      {statusLabels[appointment.status] || appointment.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="page-row-actions">
+                      <button className="btn btn-secondary btn-small" type="button" onClick={() => handleEdit(appointment)}>
+                        Изменить
+                      </button>
+                      <button className="btn btn-danger btn-small" type="button" onClick={() => handleDelete(appointment.id)}>
+                        Удалить
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

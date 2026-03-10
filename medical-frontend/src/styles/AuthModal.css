@@ -37,7 +37,7 @@
 
 .user-name {
     color: var(--color-btn-primary-text);
-    font-size: var(--font-size-sm);
+    font-size: 14px;
     font-weight: var(--font-weight-medium);
     max-width: 150px;
     overflow: hidden;
@@ -251,7 +251,7 @@
 
     .user-name {
         max-width: 100px;
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-lg);
     }
 
     .form-group label {
