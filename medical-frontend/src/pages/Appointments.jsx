@@ -92,7 +92,7 @@ export default function Appointments() {
     if (!doctor) {
       return 'Неизвестный врач';
     }
-    return [doctor.lastName, doctor.firstName].filter(Boolean).join(' ');
+    return doctor.fullName || 'Неизвестный врач';
   };
 
   const handleChange = (event) => {
@@ -185,7 +185,7 @@ export default function Appointments() {
               <option value="">Выберите врача</option>
               {doctors.map((doctor) => (
                 <option key={doctor.id} value={doctor.id}>
-                  {[doctor.lastName, doctor.firstName, doctor.specialty].filter(Boolean).join(' ')}
+                  {[doctor.fullName, doctor.specialty].filter(Boolean).join(' - ')}
                 </option>
               ))}
             </select>

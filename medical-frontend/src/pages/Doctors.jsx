@@ -1,205 +1,156 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { doctorsApi } from '../api';
+import '../styles/DoctorsCatalog.css';
 
-const initialFormData = {
-  firstName: '',
-  lastName: '',
-  specialty: '',
-  phone: '',
-  email: '',
-  licenseNumber: '',
+const INITIAL_FILTERS = {
+  search: '',
+  specialty: 'all',
 };
 
+const UNKNOWN_SPECIALTY = 'Без специализации';
+
+function getAverageRating(reviews) {
+  if (!reviews?.length) return null;
+  const sum = reviews.reduce((acc, item) => acc + Number(item.rating || 0), 0);
+  return (sum / reviews.length).toFixed(1);
+}
+
 export default function Doctors() {
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState(initialFormData);
+  const [filters, setFilters] = useState(INITIAL_FILTERS);
 
   const { data: doctors = [], isLoading } = useQuery({
-    queryKey: ['doctors'],
+    queryKey: ['public-doctors'],
     queryFn: async () => {
       const response = await doctorsApi.getAll();
       return response.data || [];
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: (payload) => doctorsApi.create(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctors'] });
-      resetForm();
-    },
-  });
+  const specialties = useMemo(() => {
+    const values = doctors
+      .map((doctor) => (doctor.specialty || '').trim())
+      .filter(Boolean);
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, payload }) => doctorsApi.update(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctors'] });
-      resetForm();
-    },
-  });
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [doctors]);
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => doctorsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctors'] });
-    },
-  });
+  const filteredDoctors = useMemo(() => {
+    const query = filters.search.trim().toLowerCase();
 
-  const resetForm = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData(initialFormData);
-  };
+    return doctors.filter((doctor) => {
+      const fullName = (doctor.fullName || '').toLowerCase();
+      const specialty = (doctor.specialty || '').toLowerCase();
+      const branch = (doctor.branch || '').toLowerCase();
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+      const matchesSearch =
+        !query || fullName.includes(query) || specialty.includes(query) || branch.includes(query);
+      const matchesSpecialty = filters.specialty === 'all' || doctor.specialty === filters.specialty;
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.specialty.trim()) {
-      window.alert('Заполните обязательные поля врача');
-      return;
-    }
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, payload: formData });
-      return;
-    }
-
-    createMutation.mutate(formData);
-  };
-
-  const handleEdit = (doctor) => {
-    setEditingId(doctor.id);
-    setFormData({
-      firstName: doctor.firstName || '',
-      lastName: doctor.lastName || '',
-      specialty: doctor.specialty || '',
-      phone: doctor.phone || '',
-      email: doctor.email || '',
-      licenseNumber: doctor.licenseNumber || '',
+      return matchesSearch && matchesSpecialty;
     });
-    setShowForm(true);
-  };
+  }, [doctors, filters]);
 
-  const handleDelete = (id) => {
-    if (window.confirm('Удалить врача?')) {
-      deleteMutation.mutate(id);
-    }
-  };
+  const groupedDoctors = useMemo(() => {
+    const groupsMap = filteredDoctors.reduce((acc, doctor) => {
+      const specialty = (doctor.specialty || '').trim() || UNKNOWN_SPECIALTY;
+      if (!acc.has(specialty)) {
+        acc.set(specialty, []);
+      }
+      acc.get(specialty).push(doctor);
+      return acc;
+    }, new Map());
+
+    return [...groupsMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], 'ru'))
+      .map(([specialty, items]) => ({ specialty, items }));
+  }, [filteredDoctors]);
 
   if (isLoading) {
     return <div className="loading">Загрузка врачей...</div>;
   }
 
   return (
-    <div className="card">
-      <div className="card-header page-toolbar">
-        <h2>Врачи</h2>
-        <div className="page-toolbar-actions">
-          {showForm ? (
-            <button className="btn btn-secondary" type="button" onClick={resetForm}>
-              Отмена
-            </button>
-          ) : null}
-          <button className="btn btn-primary" type="button" onClick={() => setShowForm(true)}>
-            Добавить врача
-          </button>
-        </div>
+    <section className="doctors-catalog">
+      <div className="doctors-filters">
+        <input
+          className="doctors-search"
+          type="search"
+          placeholder="Найти специалиста"
+          value={filters.search}
+          onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
+        />
+
+        <select
+          className="doctors-select"
+          value={filters.specialty}
+          onChange={(event) => setFilters((prev) => ({ ...prev, specialty: event.target.value }))}
+        >
+          <option value="all">Все специализации</option>
+          {specialties.map((specialty) => (
+            <option key={specialty} value={specialty}>
+              {specialty}
+            </option>
+          ))}
+        </select>
+
+        <button type="button" className="doctors-reset" onClick={() => setFilters(INITIAL_FILTERS)}>
+          Сбросить фильтр
+        </button>
       </div>
 
-      {showForm ? (
-        <form className="page-form" onSubmit={handleSubmit}>
-          <div className="modal-header">
-            <h2>{editingId ? 'Редактирование врача' : 'Создание врача'}</h2>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="firstName">Имя *</label>
-            <input id="firstName" className="form-control" name="firstName" value={formData.firstName} onChange={handleChange} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="lastName">Фамилия *</label>
-            <input id="lastName" className="form-control" name="lastName" value={formData.lastName} onChange={handleChange} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="specialty">Специальность *</label>
-            <input id="specialty" className="form-control" name="specialty" value={formData.specialty} onChange={handleChange} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="phone">Телефон</label>
-            <input id="phone" className="form-control" name="phone" value={formData.phone} onChange={handleChange} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Электронная почта</label>
-            <input id="email" className="form-control" name="email" type="email" value={formData.email} onChange={handleChange} />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="licenseNumber">Номер лицензии</label>
-            <input id="licenseNumber" className="form-control" name="licenseNumber" value={formData.licenseNumber} onChange={handleChange} />
-          </div>
-
-          <button className="btn btn-success" type="submit">
-            {editingId ? 'Сохранить' : 'Создать'}
-          </button>
-        </form>
-      ) : null}
-
-      {doctors.length === 0 ? (
+      {groupedDoctors.length === 0 ? (
         <div className="empty-state">
-          <h3>Нет врачей</h3>
-          <p>Добавьте первого врача в систему.</p>
+          <h3>Ничего не найдено</h3>
+          <p>Попробуйте изменить параметры поиска.</p>
         </div>
       ) : (
-        <div className="page-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Имя</th>
-                <th>Фамилия</th>
-                <th>Специальность</th>
-                <th>Телефон</th>
-                <th>Эл. почта</th>
-                <th>Лицензия</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doctors.map((doctor) => (
-                <tr key={doctor.id}>
-                  <td>{doctor.firstName}</td>
-                  <td>{doctor.lastName}</td>
-                  <td>{doctor.specialty}</td>
-                  <td>{doctor.phone || '—'}</td>
-                  <td>{doctor.email || '—'}</td>
-                  <td>{doctor.licenseNumber || '—'}</td>
-                  <td>
-                    <div className="page-row-actions">
-                      <button className="btn btn-secondary btn-small" type="button" onClick={() => handleEdit(doctor)}>
-                        Изменить
-                      </button>
-                      <button className="btn btn-danger btn-small" type="button" onClick={() => handleDelete(doctor.id)}>
-                        Удалить
-                      </button>
+        groupedDoctors.map((group) => (
+          <div key={group.specialty} className="doctors-group">
+            <h2 className="doctors-section-title">{group.specialty}</h2>
+            <div className="doctors-grid">
+              {group.items.map((doctor) => {
+                const reviewsCount = doctor.reviews?.length || 0;
+                const rating = getAverageRating(doctor.reviews);
+
+                return (
+                  <article key={doctor.id} className="doctor-card-catalog">
+                    <div className="doctor-card-content">
+                      <div className="doctor-meta-top">
+                        <span className="doctor-rating-text">{rating ? `★ ${rating}` : '★'}</span>
+                        <span className="doctor-dot">·</span>
+                        <span className="doctor-reviews-link">Отзывы ({reviewsCount})</span>
+                      </div>
+
+                      <h3 className="doctor-name">{doctor.fullName}</h3>
+                      <p className="doctor-specialty">{doctor.specialty || UNKNOWN_SPECIALTY}</p>
+
+                      <div className="doctor-meta-list">
+                        <p>
+                          <strong>Стаж:</strong> {doctor.experienceYears ?? 'не указан'} лет
+                        </p>
+                        <p>
+                          <strong>Филиал:</strong> {doctor.branch || 'не указан'}
+                        </p>
+                      </div>
+
+                      {doctor.description ? <p className="doctor-description">{doctor.description}</p> : null}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+                    <div className="doctor-photo-wrap">
+                      {doctor.photoUrl ? (
+                        <img src={doctor.photoUrl} alt={doctor.fullName} className="doctor-photo" loading="lazy" />
+                      ) : (
+                        <div className="doctor-photo-placeholder">Фото</div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ))
       )}
-    </div>
+    </section>
   );
 }

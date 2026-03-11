@@ -1,0 +1,43 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: appointment-service
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:appointment-db}:${DB_PORT:5432}/${DB_NAME:appointment_db}
+    username: ${DB_USER:appointment_user}
+    password: ${DB_PASSWORD:appointment_password}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:change_me_to_a_real_secret_change_me}
+
+storage:
+  minio:
+    endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+    public-url: ${MINIO_PUBLIC_URL:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+    bucket: ${MINIO_BUCKET:doctor-files}
+    public-read: ${MINIO_PUBLIC_READ:true}

@@ -1,14 +1,89 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const ACCESS_TOKEN_KEY = 'auth_access_token';
+const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+const APPOINTMENT_API_BASE = import.meta.env.VITE_APPOINTMENT_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8083/api';
 const PATIENT_API_BASE = import.meta.env.VITE_PATIENT_API_URL || 'http://localhost:8082/api';
+const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
+
+const withAuth = (config = {}) => {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!token) {
+    return config;
+  }
+
+  return {
+    ...config,
+    headers: {
+      ...(config.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  };
+};
 
 export const api = axios.create({
-  baseURL: API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: APPOINTMENT_API_BASE,
 });
+
+let refreshPromise = null;
+
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) {
+    throw new Error('No refresh token');
+  }
+
+  const response = await axios.post(
+    `${AUTH_API_BASE}/api/auth/refresh`,
+    { refreshToken },
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+
+  const { accessToken, refreshToken: nextRefreshToken } = response.data || {};
+  if (!accessToken || !nextRefreshToken) {
+    throw new Error('Invalid refresh response');
+  }
+
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+  return accessToken;
+};
+
+api.interceptors.request.use((config) => withAuth(config));
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const status = error.response?.status;
+
+    if (!originalRequest || originalRequest._retry || status !== 401) {
+      throw error;
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newToken = await refreshPromise;
+      originalRequest.headers = {
+        ...(originalRequest.headers || {}),
+        Authorization: `Bearer ${newToken}`,
+      };
+
+      return api.request(originalRequest);
+    } catch (refreshError) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      throw refreshError;
+    }
+  }
+);
 
 export const patientApi = axios.create({
   baseURL: PATIENT_API_BASE,
@@ -27,11 +102,31 @@ export const patientsApi = {
 };
 
 export const doctorsApi = {
-  getAll: () => api.get('/doctors'),
-  getById: (id) => api.get(`/doctors/${id}`),
-  create: (data) => api.post('/doctors', data),
-  update: (id, data) => api.put(`/doctors/${id}`, data),
-  delete: (id) => api.delete(`/doctors/${id}`),
+  getAll: () => api.get('/public/doctors'),
+  getById: (id) => api.get(`/public/doctors/${id}`),
+  addReview: (id, data) => api.post(`/public/doctors/${id}/reviews`, data),
+};
+
+export const adminDoctorsApi = {
+  getAll: () => api.get('/admin/doctors', withAuth()),
+  getById: (id) => api.get(`/admin/doctors/${id}`, withAuth()),
+  create: (data) => api.post('/admin/doctors', data, withAuth()),
+  update: (id, data) => api.put(`/admin/doctors/${id}`, data, withAuth()),
+  delete: (id) => api.delete(`/admin/doctors/${id}`, withAuth()),
+};
+
+export const adminReviewsApi = {
+  getByStatus: (status = 'PENDING') => api.get('/admin/reviews', withAuth({ params: { status } })),
+  updateStatus: (id, status) => api.patch(`/admin/reviews/${id}/status`, { status }, withAuth()),
+};
+
+export const adminFilesApi = {
+  upload: (file, folder = 'misc') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    return api.post('/admin/files/upload', formData, withAuth());
+  },
 };
 
 export const appointmentsApi = {

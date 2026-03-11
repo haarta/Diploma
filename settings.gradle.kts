@@ -11,7 +11,6 @@ pluginManagement {
 
 rootProject.name = "Diploma"
 
-include("backend")
 include("services:auth-service")
 include("services:patient-service")
 include("services:appointment-service")

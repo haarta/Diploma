@@ -1,21 +1,4 @@
 services:
-  db:
-    image: postgres:16
-    container_name: diploma_db
-    environment:
-      POSTGRES_DB: diploma_db
-      POSTGRES_USER: diploma_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5432:5432"
-    volumes:
-      - diploma_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U diploma_user -d diploma_db" ]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
   auth-db:
     image: postgres:16
     container_name: diploma_auth_db
@@ -48,6 +31,8 @@ services:
       DB_USER: auth_user
       DB_PASSWORD: ${AUTH_DB_PASSWORD}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       - "8081:8081"
 
@@ -87,33 +72,73 @@ services:
     ports:
       - "8082:8082"
 
-
-
-  backend:
-    build: .
-    container_name: diploma_backend
-    depends_on:
-      db:
-        condition: service_healthy
+  appointment-db:
+    image: postgres:16
+    container_name: diploma_appointment_db
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/diploma_db
-      SPRING_DATASOURCE_USERNAME: diploma_user
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "true"
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      POSTGRES_DB: appointment_db
+      POSTGRES_USER: appointment_user
+      POSTGRES_PASSWORD: ${APPOINTMENT_DB_PASSWORD:-appointment_password}
     ports:
-      - "8080:8080"
+      - "5435:5432"
+    volumes:
+      - diploma_appointment_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U appointment_user -d appointment_db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
+  minio:
+    image: minio/minio:latest
+    container_name: diploma_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - diploma_minio_data:/data
+
+  appointment-service:
+    build:
+      context: .
+      dockerfile: services/appointment-service/Dockerfile
+    container_name: diploma_appointment
+    depends_on:
+      appointment-db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      DB_HOST: appointment-db
+      DB_PORT: 5432
+      DB_NAME: appointment_db
+      DB_USER: appointment_user
+      DB_PASSWORD: ${APPOINTMENT_DB_PASSWORD:-appointment_password}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_PUBLIC_READ: ${MINIO_PUBLIC_READ}
+    ports:
+      - "8083:8083"
 
   frontend:
     build: ./medical-frontend
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      - auth-service
+      - patient-service
+      - appointment-service
 
 volumes:
-  diploma_pgdata:
   diploma_auth_pgdata:
   diploma_patient_pgdata:
+  diploma_appointment_pgdata:
+  diploma_minio_data:

@@ -20,6 +20,9 @@ spring:
 
 
 auth:
+  bootstrap:
+    admin-email: ${ADMIN_EMAIL:}
+    admin-password: ${ADMIN_PASSWORD:}
   jwt:
     secret: ${AUTH_JWT_SECRET:change_me_to_a_real_secret_change_me}
     access-ttl-minutes: ${AUTH_ACCESS_TTL_MIN:15}
