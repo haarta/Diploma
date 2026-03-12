@@ -89,12 +89,6 @@
   line-height: 1;
 }
 
-.doctor-dot {
-  color: #1f2f40;
-  font-size: 21px;
-  line-height: 1;
-}
-
 .doctor-reviews-link {
   font-size: 17px;
   color: #123555;
@@ -132,6 +126,34 @@
   color: #476683;
   font-size: 14px;
   line-height: 1.45;
+}
+
+.doctor-card-actions {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.doctor-appointment-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #9b7ae8, #7f62c9);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 14px 30px rgba(127, 98, 201, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.doctor-appointment-btn:hover {
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(127, 98, 201, 0.28);
+  opacity: 0.96;
 }
 
 .doctor-photo-wrap {
@@ -203,5 +225,9 @@
 
   .doctor-specialty {
     font-size: 22px;
+  }
+
+  .doctor-appointment-btn {
+    width: 100%;
   }
 }

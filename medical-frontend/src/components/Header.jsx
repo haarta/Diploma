@@ -22,7 +22,7 @@ export default function Header() {
             <li><Link to="/patients">Пациенты</Link></li>
             <li><Link to="/doctors">Врачи</Link></li>
             <li><Link to="/appointments">Записи</Link></li>
-            {admin ? <li><Link to="/admin/doctors">Админка</Link></li> : null}
+            {admin ? <li><Link to="/admin/doctors">Админ-панель</Link></li> : null}
           </ul>
         </nav>
 

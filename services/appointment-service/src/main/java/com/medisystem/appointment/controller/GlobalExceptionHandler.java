@@ -2,6 +2,8 @@ package com.medisystem.appointment.controller;
 
 import com.medisystem.appointment.exception.AppointmentNotFoundException;
 import com.medisystem.appointment.exception.DoctorNotFoundException;
+import com.medisystem.appointment.exception.OnlineConsultationNotFoundException;
+import com.medisystem.appointment.exception.PromotionNotFoundException;
 import com.medisystem.appointment.exception.ReviewNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,7 +17,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({DoctorNotFoundException.class, AppointmentNotFoundException.class, ReviewNotFoundException.class})
+    @ExceptionHandler({DoctorNotFoundException.class, AppointmentNotFoundException.class, ReviewNotFoundException.class, PromotionNotFoundException.class, OnlineConsultationNotFoundException.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, Object> notFound(RuntimeException ex) {
         return Map.of("error", ex.getMessage());

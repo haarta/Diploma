@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { doctorsApi } from '../api';
 import '../styles/DoctorsCatalog.css';
 
@@ -118,7 +119,6 @@ export default function Doctors() {
                     <div className="doctor-card-content">
                       <div className="doctor-meta-top">
                         <span className="doctor-rating-text">{rating ? `★ ${rating}` : '★'}</span>
-                        <span className="doctor-dot">·</span>
                         <span className="doctor-reviews-link">Отзывы ({reviewsCount})</span>
                       </div>
 
@@ -129,12 +129,15 @@ export default function Doctors() {
                         <p>
                           <strong>Стаж:</strong> {doctor.experienceYears ?? 'не указан'} лет
                         </p>
-                        <p>
-                          <strong>Филиал:</strong> {doctor.branch || 'не указан'}
-                        </p>
                       </div>
 
                       {doctor.description ? <p className="doctor-description">{doctor.description}</p> : null}
+
+                      <div className="doctor-card-actions">
+                        <Link className="doctor-appointment-btn" to={`/appointments?doctorId=${doctor.id}`}>
+                          Записаться на прием
+                        </Link>
+                      </div>
                     </div>
 
                     <div className="doctor-photo-wrap">

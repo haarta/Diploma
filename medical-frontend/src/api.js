@@ -96,6 +96,7 @@ export const patientsApi = {
   list: (params) => patientApi.get('/patients', { params }),
   getAll: (params) => patientApi.get('/patients', { params }),
   getById: (id) => patientApi.get(`/patients/${id}`),
+  getByUserId: (userId) => patientApi.get(`/patients/by-user/${userId}`),
   create: (data) => patientApi.post('/patients', data),
   update: (id, data) => patientApi.patch(`/patients/${id}`, data),
   delete: (id) => patientApi.delete(`/patients/${id}`),
@@ -107,12 +108,38 @@ export const doctorsApi = {
   addReview: (id, data) => api.post(`/public/doctors/${id}/reviews`, data),
 };
 
+export const promotionsApi = {
+  getAll: () => api.get('/public/promotions'),
+  getById: (id) => api.get(`/public/promotions/${id}`),
+};
+
+export const onlineConsultationsApi = {
+  getAll: () => api.get('/public/online-consultations'),
+  getById: (id) => api.get(`/public/online-consultations/${id}`),
+};
+
 export const adminDoctorsApi = {
   getAll: () => api.get('/admin/doctors', withAuth()),
   getById: (id) => api.get(`/admin/doctors/${id}`, withAuth()),
   create: (data) => api.post('/admin/doctors', data, withAuth()),
   update: (id, data) => api.put(`/admin/doctors/${id}`, data, withAuth()),
   delete: (id) => api.delete(`/admin/doctors/${id}`, withAuth()),
+};
+
+export const adminPromotionsApi = {
+  getAll: () => api.get('/admin/promotions', withAuth()),
+  getById: (id) => api.get(`/admin/promotions/${id}`, withAuth()),
+  create: (data) => api.post('/admin/promotions', data, withAuth()),
+  update: (id, data) => api.put(`/admin/promotions/${id}`, data, withAuth()),
+  delete: (id) => api.delete(`/admin/promotions/${id}`, withAuth()),
+};
+
+export const adminOnlineConsultationsApi = {
+  getAll: () => api.get('/admin/online-consultations', withAuth()),
+  getById: (id) => api.get(`/admin/online-consultations/${id}`, withAuth()),
+  create: (data) => api.post('/admin/online-consultations', data, withAuth()),
+  update: (id, data) => api.put(`/admin/online-consultations/${id}`, data, withAuth()),
+  delete: (id) => api.delete(`/admin/online-consultations/${id}`, withAuth()),
 };
 
 export const adminReviewsApi = {

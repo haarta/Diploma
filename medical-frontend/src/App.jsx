@@ -1,4 +1,4 @@
-﻿import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Header from './components/Header';
 import MenuBar from './components/MenuBar';
@@ -8,7 +8,9 @@ import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import Appointments from './pages/Appointments';
 import Cabinet from './pages/Cabinet';
-import AdminDoctors from './pages/AdminDoctors';
+import OnlineConsultations from './pages/OnlineConsultations';
+import Promotions from './pages/Promotions';
+import AdminPanel from './pages/AdminPanel';
 import { getAccessToken, isAdmin } from './auth';
 import './App.css';
 
@@ -32,39 +34,40 @@ function RequireAdmin({ children }) {
 
 export default function App() {
   return (
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <div className="app-container">
-            <Header />
-            <MenuBar />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/patients" element={<Patients />} />
-                <Route path="/doctors" element={<Doctors />} />
-                <Route path="/appointments" element={<Appointments />} />
-                <Route
-                  path="/admin/doctors"
-                  element={
-                    <RequireAdmin>
-                      <AdminDoctors />
-                    </RequireAdmin>
-                  }
-                />
-                <Route
-                  path="/cabinet/*"
-                  element={
-                    <RequireAuth>
-                      <Cabinet />
-                    </RequireAuth>
-                  }
-                />
-              </Routes>
-            </main>
-            <Footer />
-          </div>
-        </Router>
-      </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <div className="app-container">
+          <Header />
+          <MenuBar />
+          <main className="main-content">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/patients" element={<Patients />} />
+              <Route path="/doctors" element={<Doctors />} />
+              <Route path="/online-consultations" element={<OnlineConsultations />} />
+              <Route path="/promotions" element={<Promotions />} />
+              <Route path="/appointments" element={<Appointments />} />
+              <Route
+                path="/admin/*"
+                element={(
+                  <RequireAdmin>
+                    <AdminPanel />
+                  </RequireAdmin>
+                )}
+              />
+              <Route
+                path="/cabinet/*"
+                element={(
+                  <RequireAuth>
+                    <Cabinet />
+                  </RequireAuth>
+                )}
+              />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </QueryClientProvider>
   );
 }
-
