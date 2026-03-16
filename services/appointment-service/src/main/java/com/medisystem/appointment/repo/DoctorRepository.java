@@ -13,4 +13,6 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
     List<Doctor> findAllByOrderByFullNameAsc();
 
     Optional<Doctor> findByUserId(Long userId);
+
+    boolean existsByUserId(Long userId);
 }

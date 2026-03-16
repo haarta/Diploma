@@ -22,7 +22,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
 management:
   endpoints:
     web:
@@ -41,3 +40,14 @@ storage:
     secret-key: ${MINIO_SECRET_KEY:minioadmin123}
     bucket: ${MINIO_BUCKET:doctor-files}
     public-read: ${MINIO_PUBLIC_READ:true}
+
+app:
+  mail:
+    provider: ${MAIL_PROVIDER:}
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:0}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+    smtp-auth: ${MAIL_SMTP_AUTH:true}
+    starttls-enable: ${MAIL_SMTP_STARTTLS:true}

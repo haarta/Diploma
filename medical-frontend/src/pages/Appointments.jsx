@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { appointmentsApi, doctorsApi, patientsApi } from '../api';
-import { getTokenPayload } from '../auth';
+import { getAccessToken, getTokenPayload, subscribeAuthChange } from '../auth';
 import '../styles/AppointmentsBooking.css';
 
 const CLINIC = {
@@ -116,7 +116,7 @@ function getDoctorWeekdaySchedule(doctor, isoDate) {
   );
 }
 
-function getAvailableSlotsForDate(doctor, isoDate, appointments) {
+function getAvailableSlotsForDate(doctor, isoDate, busySlots) {
   if (!doctor || !isoDate) {
     return [];
   }
@@ -127,10 +127,9 @@ function getAvailableSlotsForDate(doctor, isoDate, appointments) {
   }
 
   const bookedTimes = new Set(
-    appointments
+    busySlots
       .filter(
         (appointment) =>
-          String(appointment.doctorId) === String(doctor.id) &&
           appointment.appointmentDate === isoDate &&
           appointment.status !== 'CANCELLED'
       )
@@ -159,61 +158,67 @@ function getDoctorName(doctor) {
 
 export default function Appointments() {
   const queryClient = useQueryClient();
-  const tokenPayload = getTokenPayload();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState(initialFilters);
   const [bookingForm, setBookingForm] = useState(initialBookingForm);
   const [showSchedule, setShowSchedule] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => getMonthStart(new Date()));
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [sessionToken, setSessionToken] = useState(() => getAccessToken());
+
+  const tokenPayload = useMemo(() => getTokenPayload(), [sessionToken]);
 
   const selectedDoctorIdFromUrl = searchParams.get('doctorId') || '';
 
-  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: ['appointments'],
-    queryFn: async () => {
-      const response = await appointmentsApi.getAll();
-      return response.data || [];
-    },
-  });
+  useEffect(() => {
+    const unsubscribe = subscribeAuthChange(() => {
+      setSessionToken(getAccessToken());
+    });
 
-  const { data: patients = [] } = useQuery({
-    queryKey: ['patients-for-appointments'],
-    queryFn: async () => {
-      const response = await patientsApi.getAll({ page: 0, size: 100, active: true, sort: 'id,desc' });
-      return response.data?.content || response.data || [];
-    },
-  });
+    return unsubscribe;
+  }, []);
 
   const { data: currentPatient = null } = useQuery({
-    queryKey: ['current-patient', tokenPayload?.userId],
+    queryKey: ['current-patient'],
     enabled: Boolean(tokenPayload?.userId),
     retry: false,
     queryFn: async () => {
-      const response = await patientsApi.getByUserId(tokenPayload.userId);
+      const response = await patientsApi.getMe();
       return response.data || null;
     },
   });
 
-  const resolvedCurrentPatient = useMemo(() => {
-    if (currentPatient) {
-      return currentPatient;
-    }
-
-    if (!tokenPayload?.email) {
-      return null;
-    }
-
-    const normalizedEmail = tokenPayload.email.trim().toLowerCase();
-    return (
-      patients.find((patient) => String(patient.email || '').trim().toLowerCase() === normalizedEmail) || null
-    );
-  }, [currentPatient, patients, tokenPayload]);
+  const { data: myAppointments = [] } = useQuery({
+    queryKey: ['my-appointments'],
+    enabled: Boolean(tokenPayload?.userId),
+    queryFn: async () => {
+      const response = await appointmentsApi.getMine();
+      return response.data || [];
+    },
+  });
 
   const { data: doctors = [], isLoading: doctorsLoading } = useQuery({
     queryKey: ['doctors-for-appointments'],
     queryFn: async () => {
       const response = await doctorsApi.getAll();
+      return response.data || [];
+    },
+  });
+
+  const monthRange = useMemo(() => {
+    const monthStart = getMonthStart(currentMonth);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    return {
+      dateFrom: toDateInputValue(monthStart),
+      dateTo: toDateInputValue(monthEnd),
+    };
+  }, [currentMonth]);
+
+  const { data: busySlots = [] } = useQuery({
+    queryKey: ['doctor-busy-slots', filters.doctorId, monthRange.dateFrom, monthRange.dateTo],
+    enabled: Boolean(filters.doctorId),
+    queryFn: async () => {
+      const response = await appointmentsApi.getBusySlots(filters.doctorId, monthRange.dateFrom, monthRange.dateTo);
       return response.data || [];
     },
   });
@@ -258,8 +263,8 @@ export default function Appointments() {
   }, [selectedDoctor]);
 
   const availableSlots = useMemo(() => {
-    return getAvailableSlotsForDate(selectedDoctor, bookingForm.appointmentDate, appointments);
-  }, [appointments, bookingForm.appointmentDate, selectedDoctor]);
+    return getAvailableSlotsForDate(selectedDoctor, bookingForm.appointmentDate, busySlots);
+  }, [bookingForm.appointmentDate, busySlots, selectedDoctor]);
 
   const calendarDays = useMemo(() => {
     const monthStart = getMonthStart(currentMonth);
@@ -280,7 +285,7 @@ export default function Appointments() {
         dayNumber: day,
         weekdayLabel: WEEKDAY_LABELS[(date.getDay() + 6) % 7],
         available:
-          getAvailableSlotsForDate(selectedDoctor, iso, appointments).some((slot) => !slot.busy),
+          getAvailableSlotsForDate(selectedDoctor, iso, busySlots).some((slot) => !slot.busy),
       });
     }
 
@@ -289,7 +294,7 @@ export default function Appointments() {
     }
 
     return days;
-  }, [appointments, currentMonth, selectedDoctor]);
+  }, [busySlots, currentMonth, selectedDoctor]);
 
   useEffect(() => {
     if (!selectedDoctorIdFromUrl || !doctors.length) {
@@ -321,27 +326,31 @@ export default function Appointments() {
   }, [tokenPayload]);
 
   useEffect(() => {
-    if (!resolvedCurrentPatient) {
+    if (!currentPatient) {
       return;
     }
 
     setBookingForm((prev) => ({
       ...prev,
-      patientId: resolvedCurrentPatient.id ? String(resolvedCurrentPatient.id) : prev.patientId,
-      fullName: resolvedCurrentPatient.fullName || prev.fullName,
-      phone: resolvedCurrentPatient.phone || prev.phone,
-      email: resolvedCurrentPatient.email || prev.email,
-      birthDate: resolvedCurrentPatient.birthDate || prev.birthDate,
+      patientId: currentPatient.id ? String(currentPatient.id) : prev.patientId,
+      fullName: currentPatient.fullName || prev.fullName,
+      phone: currentPatient.phone || prev.phone,
+      email: currentPatient.email || prev.email,
+      birthDate: currentPatient.birthDate || prev.birthDate,
     }));
-  }, [resolvedCurrentPatient]);
+  }, [currentPatient]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      let patientId = bookingForm.patientId ? Number(bookingForm.patientId) : null;
+      const liveTokenPayload = getTokenPayload();
+      if (!liveTokenPayload?.userId) {
+        throw new Error('Для записи на прием необходимо войти в аккаунт.');
+      }
+
+      let patientId = currentPatient?.id || (bookingForm.patientId ? Number(bookingForm.patientId) : null);
 
       if (!patientId) {
-        const patientResponse = await patientsApi.create({
-          userId: tokenPayload?.userId || null,
+        const patientResponse = await patientsApi.createMe({
           fullName: bookingForm.fullName.trim(),
           birthDate: bookingForm.birthDate || null,
           phone: bookingForm.phone.trim(),
@@ -367,26 +376,32 @@ export default function Appointments() {
         notesParts.push(bookingForm.notes.trim());
       }
 
-      return appointmentsApi.create({
+      return appointmentsApi.createMine({
         patientId: Number(patientId),
         doctorId: Number(selectedDoctor.id),
         appointmentDate: bookingForm.appointmentDate,
         appointmentTime: bookingForm.appointmentTime,
         status: 'SCHEDULED',
         notes: notesParts.join('\n') || null,
+        patientFullName: bookingForm.fullName.trim() || currentPatient?.fullName || '',
+        patientEmail: bookingForm.email.trim() || currentPatient?.email || '',
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['patients-for-appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['current-patient', tokenPayload?.userId] });
+      queryClient.invalidateQueries({ queryKey: ['doctor-busy-slots'] });
+      queryClient.invalidateQueries({ queryKey: ['current-patient'] });
       setBookingForm(initialBookingForm);
       setShowSchedule(false);
       setIsBookingModalOpen(false);
       window.alert('Запись успешно создана.');
     },
     onError: (error) => {
-      window.alert(error?.message || 'Не удалось оформить запись.');
+      const serverMessage =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Не удалось оформить запись.';
+      window.alert(serverMessage);
     },
   });
 
@@ -458,10 +473,15 @@ export default function Appointments() {
       return;
     }
 
+    if (!bookingForm.email.trim()) {
+      window.alert('Укажите e-mail для получения подтверждения записи.');
+      return;
+    }
+
     createMutation.mutate();
   };
 
-  if (appointmentsLoading || doctorsLoading) {
+  if (doctorsLoading) {
     return <div className="loading">Загрузка записи на прием...</div>;
   }
 
@@ -727,7 +747,7 @@ export default function Appointments() {
           <h2>Текущие записи</h2>
         </div>
 
-        {appointments.length === 0 ? (
+        {myAppointments.length === 0 ? (
           <div className="empty-state">
             <h3>Записей пока нет</h3>
             <p>После создания записи она появится в этой таблице.</p>
@@ -745,13 +765,12 @@ export default function Appointments() {
                 </tr>
               </thead>
               <tbody>
-                {appointments.map((appointment) => {
-                  const patient = patients.find((item) => String(item.id) === String(appointment.patientId));
+                {myAppointments.map((appointment) => {
                   const doctor = doctors.find((item) => String(item.id) === String(appointment.doctorId));
 
                   return (
                     <tr key={appointment.id}>
-                      <td>{patient?.fullName || 'Неизвестный пациент'}</td>
+                      <td>{currentPatient?.fullName || bookingForm.fullName || 'Пациент'}</td>
                       <td>{doctor?.fullName || 'Неизвестный врач'}</td>
                       <td>{appointment.appointmentDate || '—'}</td>
                       <td>{appointment.appointmentTime || '—'}</td>
@@ -817,6 +836,7 @@ export default function Appointments() {
                     value={bookingForm.email}
                     onChange={(event) => handleBookingFieldChange('email', event.target.value)}
                     placeholder="you@example.com"
+                    required
                   />
                 </label>
 
@@ -840,11 +860,15 @@ export default function Appointments() {
                 </label>
               </div>
 
-              {resolvedCurrentPatient ? (
+              {currentPatient ? (
                 <div className="appointments-modal__note">
                   Данные подставлены из вашего аккаунта и будут использованы для записи.
                 </div>
               ) : null}
+
+              <div className="appointments-modal__note">
+                На указанный e-mail будет отправлено подтверждение записи.
+              </div>
 
               <div className="appointments-modal__actions">
                 <button type="button" className="appointments-secondary-action" onClick={() => setIsBookingModalOpen(false)}>

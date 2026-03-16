@@ -4,11 +4,14 @@ import com.medisystem.patient.dto.PatientCreateRequest;
 import com.medisystem.patient.dto.PatientResponse;
 import com.medisystem.patient.dto.PatientUpdateRequest;
 import com.medisystem.patient.entity.Patient;
+import com.medisystem.patient.security.UserPrincipal;
 import com.medisystem.patient.service.PatientService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,22 +35,47 @@ public class PatientController {
         this.service = service;
     }
 
+    @PostMapping("/me")
+    public PatientResponse createMine(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody PatientCreateRequest req
+    ) {
+        return toResponse(service.createForUser(principal.getUserId(), req));
+    }
+
+    @GetMapping("/me")
+    public PatientResponse getMine(@AuthenticationPrincipal UserPrincipal principal) {
+        return toResponse(service.getByUserId(principal.getUserId()));
+    }
+
+    @PatchMapping("/me")
+    public PatientResponse patchMine(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody PatientUpdateRequest req
+    ) {
+        return toResponse(service.patchMine(principal.getUserId(), req));
+    }
+
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse create(@Valid @RequestBody PatientCreateRequest req) {
         return toResponse(service.create(req));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse get(@PathVariable Long id) {
         return toResponse(service.get(id));
     }
 
     @GetMapping("/by-user/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse getByUserId(@PathVariable Long userId) {
         return toResponse(service.getByUserId(userId));
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Page<PatientResponse> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String phone,
@@ -62,11 +90,13 @@ public class PatientController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public PatientResponse patch(@PathVariable Long id, @Valid @RequestBody PatientUpdateRequest req) {
         return toResponse(service.patch(id, req));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(NO_CONTENT)
     public void delete(@PathVariable Long id) {
         service.softDelete(id);

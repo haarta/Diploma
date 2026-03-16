@@ -20,9 +20,9 @@ export default function Header() {
         <nav>
           <ul className="nav-links">
             <li><Link to="/">Главная</Link></li>
-            <li><Link to="/patients">Пациенты</Link></li>
             <li><Link to="/doctors">Врачи</Link></li>
             <li><Link to="/appointments">Записи</Link></li>
+            {admin ? <li><Link to="/patients">Пациенты</Link></li> : null}
             {admin ? <li><Link to="/admin/doctors">Админ-панель</Link></li> : null}
             {doctor ? <li><Link to="/doctor/cabinet">Кабинет врача</Link></li> : null}
           </ul>

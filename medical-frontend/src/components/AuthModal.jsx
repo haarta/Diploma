@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { notifyAuthChanged } from '../auth';
 import '../styles/AuthModal.css';
 
 const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
@@ -46,12 +47,14 @@ export default function AuthModal() {
   const saveTokens = (payload) => {
     localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
+    notifyAuthChanged();
   };
 
   const clearSession = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     setUser(null);
+    notifyAuthChanged();
   };
 
   const goToCabinet = (role = user?.role) => {

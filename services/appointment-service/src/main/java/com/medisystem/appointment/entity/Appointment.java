@@ -23,6 +23,9 @@ public class Appointment {
     @Column(name = "patient_id", nullable = false)
     private Long patientId;
 
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
     @Column(name = "doctor_id", nullable = false)
     private Long doctorId;
 
@@ -51,6 +54,10 @@ public class Appointment {
         return doctorId;
     }
 
+    public Long getCreatedByUserId() {
+        return createdByUserId;
+    }
+
     public LocalDate getAppointmentDate() {
         return appointmentDate;
     }
@@ -73,6 +80,10 @@ public class Appointment {
 
     public void setDoctorId(Long doctorId) {
         this.doctorId = doctorId;
+    }
+
+    public void setCreatedByUserId(Long createdByUserId) {
+        this.createdByUserId = createdByUserId;
     }
 
     public void setAppointmentDate(LocalDate appointmentDate) {

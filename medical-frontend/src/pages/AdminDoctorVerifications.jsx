@@ -24,6 +24,22 @@ function toDoctorUpdatePayload(doctor, userId) {
   };
 }
 
+function toDoctorCreatePayload(application) {
+  return {
+    userId: application.userId,
+    fullName: application.fullName,
+    specialty: application.specialty,
+    experienceYears: 0,
+    photoUrl: '',
+    description: 'Profile created from doctor verification application.',
+    branch: '',
+    published: false,
+    prices: [],
+    schedules: [],
+    certificates: [],
+  };
+}
+
 export default function AdminDoctorVerifications() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('PENDING_VERIFICATION');
@@ -57,18 +73,21 @@ export default function AdminDoctorVerifications() {
   const approve = async (application) => {
     const selectedDoctorId = String(doctorIdByApp[application.id] || '').trim();
 
-    if (!selectedDoctorId) {
-      window.alert('Укажите Doctor ID для привязки к карточке врача.');
-      return;
-    }
+    if (selectedDoctorId) {
+      const doctor = doctorsById.get(selectedDoctorId);
+      if (!doctor) {
+        window.alert('Карточка врача не найдена.');
+        return;
+      }
+      if (doctor.userId && String(doctor.userId) !== String(application.userId)) {
+        window.alert('Эта карточка врача уже привязана к другому пользователю.');
+        return;
+      }
 
-    const doctor = doctorsById.get(selectedDoctorId);
-    if (!doctor) {
-      window.alert('Карточка врача не найдена.');
-      return;
+      await adminDoctorsApi.update(doctor.id, toDoctorUpdatePayload(doctor, application.userId));
+    } else {
+      await adminDoctorsApi.create(toDoctorCreatePayload(application));
     }
-
-    await adminDoctorsApi.update(doctor.id, toDoctorUpdatePayload(doctor, application.userId));
 
     reviewMutation.mutate({
       id: application.id,
@@ -148,7 +167,7 @@ export default function AdminDoctorVerifications() {
                       <input
                         className="form-control"
                         type="number"
-                        placeholder="Doctor ID для привязки"
+                        placeholder="Doctor ID для привязки или пусто для новой карточки"
                         value={doctorIdByApp[item.id] || ''}
                         onChange={(event) =>
                           setDoctorIdByApp((prev) => ({ ...prev, [item.id]: event.target.value }))

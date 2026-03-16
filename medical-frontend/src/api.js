@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { notifyAuthChanged } from './auth';
 
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
@@ -46,6 +47,7 @@ const refreshAccessToken = async () => {
 
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+  notifyAuthChanged();
   return accessToken;
 };
 
@@ -57,7 +59,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
 
-    if (!originalRequest || originalRequest._retry || status !== 401) {
+    if (!originalRequest || originalRequest._retry || ![401, 403].includes(status)) {
       throw error;
     }
 
@@ -80,6 +82,7 @@ api.interceptors.response.use(
     } catch (refreshError) {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
+      notifyAuthChanged();
       throw refreshError;
     }
   }
@@ -92,7 +95,47 @@ export const patientApi = axios.create({
   },
 });
 
+patientApi.interceptors.request.use((config) => withAuth(config));
+
+patientApi.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const status = error.response?.status;
+
+    if (!originalRequest || originalRequest._retry || ![401, 403].includes(status)) {
+      throw error;
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newToken = await refreshPromise;
+      originalRequest.headers = {
+        ...(originalRequest.headers || {}),
+        Authorization: `Bearer ${newToken}`,
+      };
+
+      return patientApi.request(originalRequest);
+    } catch (refreshError) {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      notifyAuthChanged();
+      throw refreshError;
+    }
+  }
+);
+
 export const patientsApi = {
+  getMe: () => patientApi.get('/patients/me'),
+  createMe: (data) => patientApi.post('/patients/me', data),
+  updateMe: (data) => patientApi.patch('/patients/me', data),
   list: (params) => patientApi.get('/patients', { params }),
   getAll: (params) => patientApi.get('/patients', { params }),
   getById: (id) => patientApi.get(`/patients/${id}`),
@@ -187,7 +230,10 @@ export const doctorVerificationApi = {
 };
 
 export const appointmentsApi = {
-  getAll: () => api.get('/appointments'),
+  getMine: () => api.get('/appointments/me', withAuth()),
+  getBusySlots: (doctorId, date) => api.get('/public/appointments/busy', { params: { doctorId, date } }),
+  createMine: (data) => api.post('/appointments/me', data, withAuth()),
+  getAll: () => api.get('/appointments', withAuth()),
   getById: (id) => api.get(`/appointments/${id}`),
   create: (data) => api.post('/appointments', data),
   update: (id, data) => api.put(`/appointments/${id}`, data),

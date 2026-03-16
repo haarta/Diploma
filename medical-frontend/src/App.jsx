@@ -52,7 +52,14 @@ export default function App() {
           <main className="main-content">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/patients" element={<Patients />} />
+              <Route
+                path="/patients"
+                element={(
+                  <RequireAdmin>
+                    <Patients />
+                  </RequireAdmin>
+                )}
+              />
               <Route path="/doctors" element={<Doctors />} />
               <Route path="/online-consultations" element={<OnlineConsultations />} />
               <Route path="/promotions" element={<Promotions />} />

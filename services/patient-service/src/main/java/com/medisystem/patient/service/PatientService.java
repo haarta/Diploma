@@ -26,6 +26,10 @@ public class PatientService {
 
     @Transactional
     public Patient create(PatientCreateRequest req) {
+        if (req.userId != null && repo.existsByUserIdAndActiveTrue(req.userId)) {
+            throw new IllegalArgumentException("Patient profile already exists for this user");
+        }
+
         var patient = new Patient(
                 req.userId,
                 req.fullName,
@@ -42,6 +46,12 @@ public class PatientService {
                 req.emergencyContactPhone
         );
         return repo.save(patient);
+    }
+
+    @Transactional
+    public Patient createForUser(long userId, PatientCreateRequest req) {
+        req.userId = userId;
+        return create(req);
     }
 
     @Transactional(readOnly = true)
@@ -84,8 +94,32 @@ public class PatientService {
     @Transactional
     public Patient patch(Long id, PatientUpdateRequest req) {
         Patient patient = get(id);
+        applyPatch(patient, req);
+        return repo.save(patient);
+    }
 
-        if (req.userId != null) patient.setUserId(req.userId);
+    @Transactional
+    public Patient patchMine(long userId, PatientUpdateRequest req) {
+        Patient patient = getByUserId(userId);
+        req.userId = null;
+        applyPatch(patient, req);
+        return repo.save(patient);
+    }
+
+    @Transactional
+    public void softDelete(Long id) {
+        Patient patient = get(id);
+        patient.setActive(false);
+        repo.save(patient);
+    }
+
+    private void applyPatch(Patient patient, PatientUpdateRequest req) {
+        if (req.userId != null) {
+            if (!req.userId.equals(patient.getUserId()) && repo.existsByUserIdAndActiveTrue(req.userId)) {
+                throw new IllegalArgumentException("Patient profile already exists for this user");
+            }
+            patient.setUserId(req.userId);
+        }
         if (req.fullName != null) patient.setFullName(req.fullName);
         if (req.birthDate != null) patient.setBirthDate(req.birthDate);
         if (req.phone != null) patient.setPhone(req.phone);
@@ -98,14 +132,5 @@ public class PatientService {
         if (req.rhFactor != null) patient.setRhFactor(req.rhFactor);
         if (req.emergencyContactName != null) patient.setEmergencyContactName(req.emergencyContactName);
         if (req.emergencyContactPhone != null) patient.setEmergencyContactPhone(req.emergencyContactPhone);
-
-        return repo.save(patient);
-    }
-
-    @Transactional
-    public void softDelete(Long id) {
-        Patient patient = get(id);
-        patient.setActive(false);
-        repo.save(patient);
     }
 }

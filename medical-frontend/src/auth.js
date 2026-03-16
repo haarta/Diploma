@@ -1,4 +1,5 @@
-﻿const ACCESS_TOKEN_KEY = 'auth_access_token';
+const ACCESS_TOKEN_KEY = 'auth_access_token';
+const AUTH_CHANGE_EVENT = 'auth-change';
 
 const decodeBase64Url = (value) => {
   try {
@@ -12,6 +13,20 @@ const decodeBase64Url = (value) => {
 
 export const getAccessToken = () => localStorage.getItem(ACCESS_TOKEN_KEY);
 
+export const notifyAuthChanged = () => {
+  window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+};
+
+export const subscribeAuthChange = (callback) => {
+  window.addEventListener(AUTH_CHANGE_EVENT, callback);
+  window.addEventListener('storage', callback);
+
+  return () => {
+    window.removeEventListener(AUTH_CHANGE_EVENT, callback);
+    window.removeEventListener('storage', callback);
+  };
+};
+
 export const getTokenPayload = () => {
   const token = getAccessToken();
   if (!token) return null;
@@ -23,7 +38,12 @@ export const getTokenPayload = () => {
   if (!decoded) return null;
 
   try {
-    return JSON.parse(decoded);
+    const payload = JSON.parse(decoded);
+    const subject = payload?.sub;
+    return {
+      ...payload,
+      userId: payload?.userId ?? (subject != null ? Number(subject) : null),
+    };
   } catch {
     return null;
   }
@@ -36,4 +56,3 @@ export const getUserRole = () => {
 
 export const isAdmin = () => getUserRole() === 'ADMIN';
 export const isDoctor = () => getUserRole() === 'DOCTOR';
-

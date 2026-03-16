@@ -69,6 +69,7 @@ services:
       DB_NAME: patient_db
       DB_USER: patient_user
       DB_PASSWORD: ${PATIENT_DB_PASSWORD}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
     ports:
       - "8082:8082"
 
@@ -125,6 +126,14 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_PUBLIC_READ: ${MINIO_PUBLIC_READ}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
     ports:
       - "8083:8083"
 

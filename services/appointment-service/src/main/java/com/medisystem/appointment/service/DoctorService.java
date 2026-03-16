@@ -115,6 +115,13 @@ public class DoctorService {
     }
 
     private void applyDoctorFields(Doctor doctor, AdminDoctorUpsertRequest req) {
+        if (req.userId() != null) {
+            var existingDoctor = doctorRepo.findByUserId(req.userId()).orElse(null);
+            if (existingDoctor != null && !existingDoctor.getId().equals(doctor.getId())) {
+                throw new IllegalArgumentException("This user is already linked to another doctor profile");
+            }
+        }
+
         doctor.setUserId(req.userId());
         doctor.setFullName(req.fullName().trim());
         doctor.setSpecialty(req.specialty().trim());

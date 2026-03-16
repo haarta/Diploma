@@ -5,7 +5,6 @@ import { appointmentsApi, doctorsApi, patientsApi } from '../api';
 import '../styles/Cabinet.css';
 
 const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
-const PATIENT_API_BASE = import.meta.env.VITE_PATIENT_API_URL || 'http://localhost:8082/api';
 const ACCESS_TOKEN_KEY = 'auth_access_token';
 const REFRESH_TOKEN_KEY = 'auth_refresh_token';
 const MEDCARD_STORAGE_KEY = 'cabinet_medcard';
@@ -118,32 +117,20 @@ export default function Cabinet() {
 
     let patientData = null;
     try {
-      const patientResponse = await axios.get(`${PATIENT_API_BASE}/patients/by-user/${meResponse.data.userId}`);
-      patientData = patientResponse.data;
+      const patientResponse = await patientsApi.getMe();
+      patientData = patientResponse.data || null;
       setPatient(patientData);
     } catch {
-      try {
-        const patientsResponse = await axios.get(`${PATIENT_API_BASE}/patients`, {
-          params: { page: 0, size: 200, active: true, sort: 'id,desc' },
-        });
-        const items = patientsResponse.data?.content || patientsResponse.data || [];
-        const normalizedEmail = String(meResponse.data.email || '').trim().toLowerCase();
-        patientData =
-          items.find((item) => String(item.email || '').trim().toLowerCase() === normalizedEmail) || null;
-        setPatient(patientData);
-      } catch {
-        setPatient(null);
-      }
+      setPatient(null);
     }
 
     try {
       const [appointmentsResponse, doctorsResponse] = await Promise.all([
-        appointmentsApi.getAll(),
+        appointmentsApi.getMine(),
         doctorsApi.getAll(),
       ]);
 
-      const allAppointments = appointmentsResponse.data || [];
-      setAppointments(patientData ? allAppointments.filter((item) => item.patientId === patientData.id) : []);
+      setAppointments(appointmentsResponse.data || []);
       setDoctors(doctorsResponse.data || []);
     } catch {
       setAppointments([]);
@@ -212,9 +199,9 @@ export default function Cabinet() {
       localStorage.setItem(MEDCARD_STORAGE_KEY, JSON.stringify(storedByUser));
     }
 
-    if (patient?.id) {
+    if (patient) {
       try {
-        await patientsApi.update(patient.id, {
+        await patientsApi.updateMe({
           gender: medcardForm.gender || null,
           bloodGroup: medcardForm.bloodGroup || null,
           rhFactor: medcardForm.rhFactor || null,
@@ -268,9 +255,9 @@ export default function Cabinet() {
       return;
     }
 
-    if (patient?.id) {
+    if (patient) {
       try {
-        await patientsApi.update(patient.id, {
+        await patientsApi.updateMe({
           birthDate: editForm.birthDate || null,
           email: editForm.email || null,
           address: editForm.address || null,
