@@ -24,6 +24,9 @@ public class Doctor {
     @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Column(name = "user_id", unique = true)
+    private Long userId;
+
     @Column(nullable = false)
     private String specialty;
 
@@ -64,6 +67,10 @@ public class Doctor {
 
     public String getSpecialty() {
         return specialty;
+    }
+
+    public Long getUserId() {
+        return userId;
     }
 
     public Integer getExperienceYears() {
@@ -108,6 +115,10 @@ public class Doctor {
 
     public void setSpecialty(String specialty) {
         this.specialty = specialty;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public void setExperienceYears(Integer experienceYears) {

@@ -8,10 +8,12 @@ import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import Appointments from './pages/Appointments';
 import Cabinet from './pages/Cabinet';
+import DoctorCabinet from './pages/DoctorCabinet';
+import DoctorVerificationRequest from './pages/DoctorVerificationRequest';
 import OnlineConsultations from './pages/OnlineConsultations';
 import Promotions from './pages/Promotions';
 import AdminPanel from './pages/AdminPanel';
-import { getAccessToken, isAdmin } from './auth';
+import { getAccessToken, isAdmin, isDoctor } from './auth';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -27,6 +29,14 @@ function RequireAuth({ children }) {
 function RequireAdmin({ children }) {
   const token = getAccessToken();
   if (!token || !isAdmin()) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function RequireDoctor({ children }) {
+  const token = getAccessToken();
+  if (!token || !isDoctor()) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -60,6 +70,22 @@ export default function App() {
                 element={(
                   <RequireAuth>
                     <Cabinet />
+                  </RequireAuth>
+                )}
+              />
+              <Route
+                path="/doctor/cabinet"
+                element={(
+                  <RequireDoctor>
+                    <DoctorCabinet />
+                  </RequireDoctor>
+                )}
+              />
+              <Route
+                path="/cabinet/doctor-verification"
+                element={(
+                  <RequireAuth>
+                    <DoctorVerificationRequest />
                   </RequireAuth>
                 )}
               />

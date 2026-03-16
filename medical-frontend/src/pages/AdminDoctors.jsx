@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminDoctorsApi, adminFilesApi, adminReviewsApi } from '../api';
 
 const emptyDoctor = {
+  userId: '',
   fullName: '',
   specialty: '',
   experienceYears: '',
@@ -47,6 +48,7 @@ const getApiErrorMessage = (error, fallbackMessage) => {
 };
 
 const normalizeDoctor = (doctor) => ({
+  userId: doctor.userId ?? '',
   fullName: doctor.fullName || '',
   specialty: doctor.specialty || '',
   experienceYears: doctor.experienceYears ?? '',
@@ -144,6 +146,7 @@ export default function AdminDoctors() {
   };
 
   const toPayload = () => ({
+    userId: form.userId === '' ? null : Number(form.userId),
     fullName: form.fullName.trim(),
     specialty: form.specialty.trim(),
     experienceYears: form.experienceYears === '' ? null : Number(form.experienceYears),
@@ -238,6 +241,7 @@ export default function AdminDoctors() {
           <h2>{editingId ? 'Редактирование врача' : 'Создание врача'}</h2>
         </div>
 
+        <div className="form-group"><label>ID учетной записи врача</label><input className="form-control" type="number" min="1" value={form.userId} onChange={(e) => updateField('userId', e.target.value)} /></div>
         <div className="form-group"><label>ФИО *</label><input className="form-control" value={form.fullName} onChange={(e) => updateField('fullName', e.target.value)} /></div>
         <div className="form-group"><label>Специальность *</label><input className="form-control" value={form.specialty} onChange={(e) => updateField('specialty', e.target.value)} /></div>
         <div className="form-group"><label>Стаж (лет)</label><input className="form-control" type="number" min="0" value={form.experienceYears} onChange={(e) => updateField('experienceYears', e.target.value)} /></div>
@@ -289,11 +293,12 @@ export default function AdminDoctors() {
       <div className="page-table-wrap" style={{ marginTop: 20 }}>
         <table>
           <thead>
-            <tr><th>ФИО</th><th>Специальность</th><th>Филиал</th><th>Публикация</th><th>Действия</th></tr>
+            <tr><th>User ID</th><th>ФИО</th><th>Специальность</th><th>Филиал</th><th>Публикация</th><th>Действия</th></tr>
           </thead>
           <tbody>
             {doctors.map((doctor) => (
               <tr key={doctor.id}>
+                <td>{doctor.userId || '—'}</td>
                 <td>{doctor.fullName}</td>
                 <td>{doctor.specialty}</td>
                 <td>{doctor.branch || '—'}</td>

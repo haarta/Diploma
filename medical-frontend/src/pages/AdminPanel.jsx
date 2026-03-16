@@ -1,5 +1,6 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+﻿import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import AdminDoctors from './AdminDoctors';
+import AdminDoctorVerifications from './AdminDoctorVerifications';
 import AdminOnlineConsultations from './AdminOnlineConsultations';
 import AdminPromotions from './AdminPromotions';
 
@@ -18,6 +19,9 @@ export default function AdminPanel() {
             <NavLink end to="/admin/doctors" className={getTabClassName}>
               Врачи
             </NavLink>
+            <NavLink to="/admin/doctor-verifications" className={getTabClassName}>
+              Заявки врачей
+            </NavLink>
             <NavLink to="/admin/online-consultations" className={getTabClassName}>
               Онлайн-консультации
             </NavLink>
@@ -30,6 +34,7 @@ export default function AdminPanel() {
         <Routes>
           <Route index element={<Navigate to="/admin/doctors" replace />} />
           <Route path="doctors" element={<AdminDoctors />} />
+          <Route path="doctor-verifications" element={<AdminDoctorVerifications />} />
           <Route path="online-consultations" element={<AdminOnlineConsultations />} />
           <Route path="promotions" element={<AdminPromotions />} />
           <Route path="*" element={<Navigate to="/admin/doctors" replace />} />

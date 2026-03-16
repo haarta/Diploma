@@ -35,4 +35,13 @@ public class AuthController {
     public MeResponse me(@AuthenticationPrincipal UserPrincipal principal) {
         return new MeResponse(principal.getUserId(), principal.getUsername(), principal.getRole());
     }
+
+    @PatchMapping("/me")
+    public MeResponse updateMe(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody @Valid UpdateMeRequest req
+    ) {
+        var updated = auth.updateMe(principal.getUserId(), req.email, req.password);
+        return new MeResponse(updated.getId(), updated.getEmail(), updated.getRole().name());
+    }
 }

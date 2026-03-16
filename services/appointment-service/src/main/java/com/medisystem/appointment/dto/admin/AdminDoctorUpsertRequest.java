@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 public record AdminDoctorUpsertRequest(
+        Long userId,
         @NotBlank String fullName,
         @NotBlank String specialty,
         Integer experienceYears,

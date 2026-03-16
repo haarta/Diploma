@@ -99,6 +99,11 @@
   color: #b42318;
 }
 
+.cabinet-success {
+  margin-top: 12px;
+  color: #157347;
+}
+
 .cabinet-list {
   display: flex;
   flex-direction: column;
@@ -126,6 +131,47 @@
   font-size: 18px;
   border-bottom: 1px solid #ddd;
   padding-bottom: 6px;
+}
+
+.cabinet-medcard-form {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cabinet-medcard-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cabinet-medcard-field span {
+  font-size: 16px;
+  color: #444;
+}
+
+.cabinet-medcard-field input,
+.cabinet-medcard-field select {
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 16px;
+  background: #fff;
+}
+
+.cabinet-medcard-textarea {
+  border: 1px solid #d6d6d6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 16px;
+  background: #fff;
+  resize: vertical;
+}
+
+.cabinet-medcard-actions {
+  grid-column: 1 / -1;
+  margin-top: 8px;
 }
 
 @media (max-width: 1200px) {
@@ -185,6 +231,10 @@
 
   .cabinet-mini-item {
     font-size: 16px;
+  }
+
+  .cabinet-medcard-form {
+    grid-template-columns: 1fr;
   }
 }
 

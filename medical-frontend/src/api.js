@@ -156,6 +156,36 @@ export const adminFilesApi = {
   },
 };
 
+export const filesApi = {
+  upload: (file, folder = 'misc') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    return api.post('/files/upload', formData, withAuth());
+  },
+};
+
+export const doctorApi = {
+  getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming', withAuth()),
+  getDocuments: (params) => api.get('/doctor/documents', withAuth({ params })),
+  uploadDocument: (file, appointmentId, type = 'OTHER') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('appointmentId', String(appointmentId));
+    formData.append('type', type);
+    return api.post('/doctor/documents/upload', formData, withAuth());
+  },
+};
+
+export const doctorVerificationApi = {
+  getMine: () => axios.get(`${AUTH_API_BASE}/api/auth/doctor-verification/me`, withAuth()),
+  submit: (data) => axios.post(`${AUTH_API_BASE}/api/auth/doctor-verification/submit`, data, withAuth()),
+  adminList: (status = 'PENDING_VERIFICATION') =>
+    axios.get(`${AUTH_API_BASE}/api/admin/doctor-verifications`, withAuth({ params: { status } })),
+  adminReview: (id, data) =>
+    axios.patch(`${AUTH_API_BASE}/api/admin/doctor-verifications/${id}/review`, data, withAuth()),
+};
+
 export const appointmentsApi = {
   getAll: () => api.get('/appointments'),
   getById: (id) => api.get(`/appointments/${id}`),

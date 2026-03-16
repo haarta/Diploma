@@ -10,6 +10,7 @@ import com.medisystem.auth.security.JwtService;
 import io.jsonwebtoken.Claims;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -79,6 +80,26 @@ public class AuthService {
         return issueTokens(u);
     }
 
+    @Transactional
+    public UserAccount updateMe(long userId, String email, String password) {
+        UserAccount user = users.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (email != null && !email.isBlank()) {
+            String normalizedEmail = email.trim().toLowerCase();
+            if (!normalizedEmail.equalsIgnoreCase(user.getEmail()) && users.existsByEmailIgnoreCase(normalizedEmail)) {
+                throw new IllegalArgumentException("Email already registered");
+            }
+            user.setEmail(normalizedEmail);
+        }
+
+        if (password != null && !password.isBlank()) {
+            user.setPasswordHash(encoder.encode(password));
+        }
+
+        return users.save(user);
+    }
+
     private TokenResponse issueTokens(UserAccount u) {
         String access = jwt.createAccessToken(u.getId(), u.getEmail(), u.getRole());
 
@@ -95,4 +116,5 @@ public class AuthService {
 
         return new TokenResponse(access, refreshJwt);
     }
+
 }

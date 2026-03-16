@@ -1,9 +1,10 @@
 ﻿import { Link } from 'react-router-dom';
 import AuthModal from './AuthModal';
-import { isAdmin } from '../auth';
+import { isAdmin, isDoctor } from '../auth';
 
 export default function Header() {
   const admin = isAdmin();
+  const doctor = isDoctor();
 
   return (
     <header className="header">
@@ -23,6 +24,7 @@ export default function Header() {
             <li><Link to="/doctors">Врачи</Link></li>
             <li><Link to="/appointments">Записи</Link></li>
             {admin ? <li><Link to="/admin/doctors">Админ-панель</Link></li> : null}
+            {doctor ? <li><Link to="/doctor/cabinet">Кабинет врача</Link></li> : null}
           </ul>
         </nav>
 
@@ -31,4 +33,3 @@ export default function Header() {
     </header>
   );
 }
-

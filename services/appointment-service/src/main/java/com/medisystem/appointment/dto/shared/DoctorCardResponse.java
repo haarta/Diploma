@@ -4,6 +4,7 @@ import java.util.List;
 
 public record DoctorCardResponse(
         Long id,
+        Long userId,
         String fullName,
         String specialty,
         Integer experienceYears,

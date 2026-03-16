@@ -3,9 +3,15 @@ package com.medisystem.appointment.repo;
 import com.medisystem.appointment.entity.Appointment;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
     List<Appointment> findAllByOrderByAppointmentDateDescAppointmentTimeDesc();
+
+    List<Appointment> findAllByDoctorIdAndAppointmentDateGreaterThanEqualOrderByAppointmentDateAscAppointmentTimeAsc(
+            Long doctorId,
+            LocalDate appointmentDate
+    );
 }

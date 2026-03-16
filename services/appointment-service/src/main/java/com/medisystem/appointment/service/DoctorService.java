@@ -115,6 +115,7 @@ public class DoctorService {
     }
 
     private void applyDoctorFields(Doctor doctor, AdminDoctorUpsertRequest req) {
+        doctor.setUserId(req.userId());
         doctor.setFullName(req.fullName().trim());
         doctor.setSpecialty(req.specialty().trim());
         doctor.setExperienceYears(req.experienceYears());
@@ -197,6 +198,7 @@ public class DoctorService {
 
         return new DoctorCardResponse(
                 doctor.getId(),
+                doctor.getUserId(),
                 doctor.getFullName(),
                 doctor.getSpecialty(),
                 doctor.getExperienceYears(),

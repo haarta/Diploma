@@ -54,8 +54,12 @@ export default function AuthModal() {
     setUser(null);
   };
 
-  const goToCabinet = () => {
+  const goToCabinet = (role = user?.role) => {
     setIsOpen(false);
+    if (role === 'DOCTOR') {
+      navigate('/doctor/cabinet');
+      return;
+    }
     navigate('/cabinet/info');
   };
 
@@ -160,7 +164,7 @@ export default function AuthModal() {
       const me = await fetchMe(response.data.accessToken);
       setUser(me);
       setFormData({ email: '', password: '' });
-      goToCabinet();
+      goToCabinet(me?.role);
     } catch (requestError) {
       setError(extractErrorMessage(requestError));
     } finally {
