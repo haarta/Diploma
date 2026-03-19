@@ -10,4 +10,6 @@ public interface DoctorMedicalDocumentRepository extends JpaRepository<DoctorMed
     List<DoctorMedicalDocument> findAllByDoctorIdOrderByCreatedAtDesc(Long doctorId);
 
     List<DoctorMedicalDocument> findAllByDoctorIdAndAppointmentIdOrderByCreatedAtDesc(Long doctorId, Long appointmentId);
+
+    List<DoctorMedicalDocument> findAllByAppointmentIdInOrderByCreatedAtDesc(List<Long> appointmentIds);
 }

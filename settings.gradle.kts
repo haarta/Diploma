@@ -14,3 +14,4 @@ rootProject.name = "Diploma"
 include("services:auth-service")
 include("services:patient-service")
 include("services:appointment-service")
+include("services:notification-service")

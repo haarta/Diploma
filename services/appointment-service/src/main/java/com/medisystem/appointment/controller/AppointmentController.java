@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,6 +44,14 @@ public class AppointmentController {
             @Valid @RequestBody AppointmentCreateRequest req
     ) {
         return service.createMine(principal.getUserId(), req);
+    }
+
+    @PatchMapping("/me/{id}/cancel")
+    public Appointment cancelMine(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id
+    ) {
+        return service.cancelMine(principal.getUserId(), id);
     }
 
     @GetMapping

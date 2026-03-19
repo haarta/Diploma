@@ -5,6 +5,23 @@ spring:
   application:
     name: appointment-service
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    admin:
+      auto-create: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:appointment-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.medisystem.appointment.messaging
+
   servlet:
     multipart:
       max-file-size: 20MB
@@ -15,9 +32,14 @@ spring:
     username: ${DB_USER:appointment_user}
     password: ${DB_PASSWORD:appointment_password}
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     open-in-view: false
     properties:
       hibernate:
@@ -40,14 +62,3 @@ storage:
     secret-key: ${MINIO_SECRET_KEY:minioadmin123}
     bucket: ${MINIO_BUCKET:doctor-files}
     public-read: ${MINIO_PUBLIC_READ:true}
-
-app:
-  mail:
-    provider: ${MAIL_PROVIDER:}
-    host: ${MAIL_HOST:}
-    port: ${MAIL_PORT:0}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    from: ${MAIL_FROM:}
-    smtp-auth: ${MAIL_SMTP_AUTH:true}
-    starttls-enable: ${MAIL_SMTP_STARTTLS:true}

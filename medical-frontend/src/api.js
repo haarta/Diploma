@@ -190,6 +190,12 @@ export const adminReviewsApi = {
   updateStatus: (id, status) => api.patch(`/admin/reviews/${id}/status`, { status }, withAuth()),
 };
 
+export const adminReportsApi = {
+  getDashboard: (params = {}) => api.get('/admin/reports/dashboard', withAuth({ params })),
+  exportExcel: (params = {}) => api.get('/admin/reports/export.xlsx', withAuth({ params, responseType: 'blob' })),
+  exportPdf: (params = {}) => api.get('/admin/reports/export.pdf', withAuth({ params, responseType: 'blob' })),
+};
+
 export const adminFilesApi = {
   upload: (file, folder = 'misc') => {
     const formData = new FormData();
@@ -210,6 +216,7 @@ export const filesApi = {
 
 export const doctorApi = {
   getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming', withAuth()),
+  updateAppointmentStatus: (id, data) => api.patch(`/doctor/appointments/${id}/status`, data, withAuth()),
   getDocuments: (params) => api.get('/doctor/documents', withAuth({ params })),
   uploadDocument: (file, appointmentId, type = 'OTHER') => {
     const formData = new FormData();
@@ -218,6 +225,10 @@ export const doctorApi = {
     formData.append('type', type);
     return api.post('/doctor/documents/upload', formData, withAuth());
   },
+};
+
+export const patientDocumentsApi = {
+  getMine: () => api.get('/patient-documents/me', withAuth()),
 };
 
 export const doctorVerificationApi = {
@@ -233,9 +244,21 @@ export const appointmentsApi = {
   getMine: () => api.get('/appointments/me', withAuth()),
   getBusySlots: (doctorId, date) => api.get('/public/appointments/busy', { params: { doctorId, date } }),
   createMine: (data) => api.post('/appointments/me', data, withAuth()),
+  cancelMine: (id) => api.patch(`/appointments/me/${id}/cancel`, null, withAuth()),
   getAll: () => api.get('/appointments', withAuth()),
   getById: (id) => api.get(`/appointments/${id}`),
   create: (data) => api.post('/appointments', data),
   update: (id, data) => api.put(`/appointments/${id}`, data),
   delete: (id) => api.delete(`/appointments/${id}`),
+};
+
+export const labResultsApi = {
+  getMine: () => api.get('/lab-results/me', withAuth()),
+};
+
+export const notificationsApi = {
+  getMine: () => api.get('/notifications/me', withAuth()),
+  getUnreadCount: () => api.get('/notifications/me/unread-count', withAuth()),
+  markAsRead: (id) => api.patch(`/notifications/me/${id}/read`, null, withAuth()),
+  markAllAsRead: () => api.post('/notifications/me/read-all', null, withAuth()),
 };

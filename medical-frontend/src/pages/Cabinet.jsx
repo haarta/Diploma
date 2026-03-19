@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { appointmentsApi, doctorsApi, patientsApi } from '../api';
+import {
+  appointmentsApi,
+  doctorsApi,
+  labResultsApi,
+  notificationsApi,
+  patientDocumentsApi,
+  patientsApi,
+} from '../api';
 import '../styles/Cabinet.css';
 
 const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
@@ -11,49 +18,44 @@ const MEDCARD_STORAGE_KEY = 'cabinet_medcard';
 
 const STATUS_LABELS = {
   SCHEDULED: 'Запланирована',
+  CONFIRMED: 'Подтверждена',
   COMPLETED: 'Завершена',
   CANCELLED: 'Отменена',
+  NO_SHOW: 'Неявка',
 };
 
 function formatTime(value) {
-  if (!value) {
-    return '—';
-  }
-  return String(value).slice(0, 5);
+  return value ? String(value).slice(0, 5) : '—';
 }
 
 function formatBirthDate(value) {
-  if (!value) {
-    return 'не указана';
-  }
-
+  if (!value) return 'не указана';
   const [year, month, day] = String(value).split('-');
-  if (!year || !month || !day) {
-    return value;
-  }
+  return year && month && day ? `${day}-${month}-${year}` : value;
+}
 
-  return `${day}-${month}-${year}`;
+function formatDateTime(value) {
+  if (!value) return 'Дата не указана';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function calculateAge(value) {
-  if (!value) {
-    return 'не указан';
-  }
-
+  if (!value) return 'не указан';
   const birthDate = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(birthDate.getTime())) {
-    return 'не указан';
-  }
-
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  const dayDiff = today.getDate() - birthDate.getDate();
-
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    age -= 1;
-  }
-
+  if (Number.isNaN(birthDate.getTime())) return 'не указан';
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  const dayDiff = now.getDate() - birthDate.getDate();
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
   return age >= 0 ? age : 'не указан';
 }
 
@@ -66,6 +68,9 @@ export default function Cabinet() {
   const [patient, setPatient] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [labResults, setLabResults] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [patientDocuments, setPatientDocuments] = useState([]);
   const [medcardForm, setMedcardForm] = useState({
     height: '',
     weight: '',
@@ -93,7 +98,6 @@ export default function Cabinet() {
 
   const loadCabinet = async () => {
     const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-
     if (!accessToken) {
       logout();
       return;
@@ -102,39 +106,50 @@ export default function Cabinet() {
     setLoading(true);
     setError('');
 
-    let meResponse;
     try {
-      meResponse = await axios.get(`${AUTH_API_BASE}/api/auth/me`, {
+      const meResponse = await axios.get(`${AUTH_API_BASE}/api/auth/me`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      setProfile(meResponse.data);
     } catch {
       setError('Сессия истекла. Выполните вход заново.');
       logout();
       return;
     }
 
-    setProfile(meResponse.data);
-
-    let patientData = null;
     try {
       const patientResponse = await patientsApi.getMe();
-      patientData = patientResponse.data || null;
-      setPatient(patientData);
+      setPatient(patientResponse.data || null);
     } catch {
       setPatient(null);
     }
 
     try {
-      const [appointmentsResponse, doctorsResponse] = await Promise.all([
+      const [
+        appointmentsResponse,
+        doctorsResponse,
+        labResultsResponse,
+        notificationsResponse,
+        documentsResponse,
+      ] = await Promise.all([
         appointmentsApi.getMine(),
         doctorsApi.getAll(),
+        labResultsApi.getMine(),
+        notificationsApi.getMine(),
+        patientDocumentsApi.getMine(),
       ]);
 
       setAppointments(appointmentsResponse.data || []);
       setDoctors(doctorsResponse.data || []);
+      setLabResults(labResultsResponse.data || []);
+      setNotifications(notificationsResponse.data || []);
+      setPatientDocuments(documentsResponse.data || []);
     } catch {
       setAppointments([]);
       setDoctors([]);
+      setLabResults([]);
+      setNotifications([]);
+      setPatientDocuments([]);
       setError('Не удалось загрузить данные личного кабинета.');
     } finally {
       setLoading(false);
@@ -155,9 +170,7 @@ export default function Cabinet() {
   }, [profile?.email, patient?.birthDate, patient?.address]);
 
   useEffect(() => {
-    if (!profile?.userId) {
-      return;
-    }
+    if (!profile?.userId) return;
 
     let storedByUser = {};
     try {
@@ -234,10 +247,7 @@ export default function Cabinet() {
     try {
       await axios.patch(
         `${AUTH_API_BASE}/api/auth/me`,
-        {
-          email: editForm.email || null,
-          password: editForm.password || null,
-        },
+        { email: editForm.email || null, password: editForm.password || null },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
@@ -263,7 +273,7 @@ export default function Cabinet() {
           address: editForm.address || null,
         });
       } catch {
-        setEditError('Email/пароль сохранены, но не удалось обновить дату рождения.');
+        setEditError('Email и пароль сохранены, но не удалось обновить персональные данные.');
         return;
       }
     }
@@ -273,57 +283,110 @@ export default function Cabinet() {
     setEditMessage('Данные успешно обновлены.');
   };
 
+  const cancelAppointment = async (appointmentId) => {
+    try {
+      await appointmentsApi.cancelMine(appointmentId);
+      await loadCabinet();
+      setError('');
+      window.alert('Запись отменена.');
+    } catch (requestError) {
+      const message =
+        requestError?.response?.data?.error ||
+        requestError?.response?.data?.message ||
+        requestError?.message ||
+        'Не удалось отменить запись.';
+      setError(message);
+      window.alert(message);
+    }
+  };
+
+  const openNotification = async (item) => {
+    try {
+      if (!item.read) {
+        await notificationsApi.markAsRead(item.id);
+      }
+    } catch {
+      // ignore
+    }
+    await loadCabinet();
+    if (item.linkPath) {
+      navigate(item.linkPath);
+    }
+  };
+
+  const activeAppointments = useMemo(
+    () =>
+      appointments
+        .filter((item) => item.status === 'SCHEDULED' || item.status === 'CONFIRMED')
+        .filter((item) => {
+          if (!item.appointmentDate || !item.appointmentTime) return false;
+          const appointmentDateTime = new Date(`${item.appointmentDate}T${item.appointmentTime}`);
+          return !Number.isNaN(appointmentDateTime.getTime()) && appointmentDateTime >= new Date();
+        })
+        .sort((a, b) => {
+          const left = `${a.appointmentDate || ''}T${a.appointmentTime || '00:00'}`;
+          const right = `${b.appointmentDate || ''}T${b.appointmentTime || '00:00'}`;
+          return left.localeCompare(right);
+        }),
+    [appointments]
+  );
+
   const servicesItems = useMemo(
     () =>
-      appointments.map((item) => {
+      activeAppointments.map((item) => {
         const doctor = doctors.find((doctorItem) => String(doctorItem.id) === String(item.doctorId));
-        const serviceName = String(item.notes || '').replace(/^Услуга:\s*/i, '').trim();
-
         return {
           id: item.id,
           title: `Запись на ${item.appointmentDate || 'дату без уточнения'}`,
-          doctorLine: doctor
-            ? `${doctor.fullName}${doctor.specialty ? `, ${doctor.specialty}` : ''}`
-            : 'Специалист не найден',
-          serviceLine: serviceName || 'Услуга не указана',
+          doctorLine: doctor ? `${doctor.fullName}${doctor.specialty ? `, ${doctor.specialty}` : ''}` : 'Специалист не найден',
+          serviceLine: item.serviceName || 'Услуга не указана',
           status: STATUS_LABELS[item.status] || item.status,
           time: formatTime(item.appointmentTime),
         };
       }),
-    [appointments, doctors]
+    [activeAppointments, doctors]
   );
 
   const visitsItems = useMemo(
     () =>
       appointments
-        .filter((item) => item.status === 'COMPLETED')
+        .filter((item) => item.status === 'COMPLETED' || item.status === 'NO_SHOW')
         .map((item) => {
           const doctor = doctors.find((doctorItem) => String(doctorItem.id) === String(item.doctorId));
+          const documents = patientDocuments.filter((doc) => String(doc.appointmentId) === String(item.id));
           return {
             id: item.id,
-            title: `Прием ${item.appointmentDate || 'без даты'}`,
-            subtitle: doctor
-              ? `${doctor.fullName}${doctor.specialty ? `, ${doctor.specialty}` : ''}`
-              : 'Посещение врача',
+            title: `Приём ${item.appointmentDate || 'без даты'}`,
+            subtitle: doctor ? `${doctor.fullName}${doctor.specialty ? `, ${doctor.specialty}` : ''}` : 'Посещение врача',
             time: formatTime(item.appointmentTime),
+            status: STATUS_LABELS[item.status] || item.status,
+            completionSummary: item.completionSummary || '',
+            documents,
           };
         }),
-    [appointments, doctors]
+    [appointments, doctors, patientDocuments]
   );
 
-  const analysisItems = [
-    { id: 1, title: 'Общий анализ крови', result: 'Без отклонений', date: '2026-03-05' },
-    { id: 2, title: 'Биохимический анализ', result: 'Требуется консультация врача', date: '2026-02-19' },
-    { id: 3, title: 'Анализ мочи', result: 'Показатели в норме', date: '2026-01-28' },
-  ];
+  const labResultCards = useMemo(
+    () =>
+      labResults.map((item) => {
+        const readyDate = new Date(item.readyAt);
+        const isReady = !Number.isNaN(readyDate.getTime()) && readyDate <= new Date();
+        return {
+          ...item,
+          statusLabel: isReady ? 'Готов' : 'В обработке',
+          isReady,
+          displayDate: formatDateTime(isReady ? item.readyAt : item.orderedAt),
+        };
+      }),
+    [labResults]
+  );
+
+  const unreadNotifications = notifications.filter((item) => !item.read);
 
   const renderContent = () => {
     if (loading) {
-      return (
-        <div className="cabinet-card">
-          <p>Загрузка профиля...</p>
-        </div>
-      );
+      return <div className="cabinet-card"><p>Загрузка профиля...</p></div>;
     }
 
     if (location.pathname === '/cabinet/info') {
@@ -337,7 +400,32 @@ export default function Cabinet() {
           <p><strong>Дата рождения:</strong> {formatBirthDate(patient?.birthDate)}</p>
           <p><strong>Возраст:</strong> {calculateAge(patient?.birthDate)}</p>
           <p><strong>Адрес:</strong> {patient?.address || 'не указан'}</p>
-          {!patient ? <p className="cabinet-hint">Карточка пациента пока не создана.</p> : null}
+        </div>
+      );
+    }
+
+    if (location.pathname === '/cabinet/notifications') {
+      return (
+        <div className="cabinet-card">
+          <h2>Уведомления</h2>
+          <div className="cabinet-list">
+            {notifications.length === 0 ? (
+              <p className="cabinet-hint">Уведомлений пока нет.</p>
+            ) : (
+              notifications.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`cabinet-notification-item${item.read ? '' : ' cabinet-notification-item--unread'}`}
+                  onClick={() => openNotification(item)}
+                >
+                  <strong>{item.title}</strong>
+                  <span>{item.message}</span>
+                  <small>{formatDateTime(item.createdAt)}</small>
+                </button>
+              ))
+            )}
+          </div>
         </div>
       );
     }
@@ -357,6 +445,15 @@ export default function Cabinet() {
                   <p><strong>Услуга:</strong> {item.serviceLine}</p>
                   <p><strong>Время:</strong> {item.time}</p>
                   <p><strong>Статус:</strong> {item.status}</p>
+                  <button
+                    className="cabinet-inline-action"
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Отменить эту запись?')) cancelAppointment(item.id);
+                    }}
+                  >
+                    Отменить запись
+                  </button>
                 </div>
               ))
             )}
@@ -368,16 +465,27 @@ export default function Cabinet() {
     if (location.pathname === '/cabinet/visits') {
       return (
         <div className="cabinet-card">
-          <h2>Мои приемы</h2>
+          <h2>Мои приёмы</h2>
           <div className="cabinet-list">
             {visitsItems.length === 0 ? (
-              <p className="cabinet-hint">Завершенных приемов пока нет.</p>
+              <p className="cabinet-hint">Завершённых приёмов пока нет.</p>
             ) : (
               visitsItems.map((item) => (
                 <div className="cabinet-list-item" key={item.id}>
                   <h4>{item.title}</h4>
                   <p>{item.subtitle}</p>
                   <p><strong>Время:</strong> {item.time}</p>
+                  <p><strong>Статус:</strong> {item.status}</p>
+                  {item.completionSummary ? <p><strong>Заключение:</strong> {item.completionSummary}</p> : null}
+                  {item.documents.length > 0 ? (
+                    <div className="cabinet-doc-links">
+                      {item.documents.map((doc) => (
+                        <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer">
+                          {doc.fileName}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -390,13 +498,24 @@ export default function Cabinet() {
       return (
         <div className="cabinet-card">
           <h2>Результаты анализов</h2>
-          <div className="cabinet-list">
-            {analysisItems.map((item) => (
-              <div className="cabinet-list-item" key={item.id}>
-                <h4>{item.title}</h4>
-                <p><strong>Дата:</strong> {item.date}</p>
-                <p><strong>Результат:</strong> {item.result}</p>
-              </div>
+          <p className="cabinet-hint">Готовые результаты открываются в формате PDF по нажатию на карточку.</p>
+          <div className="cabinet-labs-list">
+            {labResultCards.map((item) => (
+              <button
+                type="button"
+                className={`cabinet-lab-card${item.isReady ? '' : ' cabinet-lab-card--pending'}`}
+                key={item.id}
+                onClick={() => {
+                  if (item.isReady) {
+                    window.open(item.pdfUrl, '_blank', 'noopener,noreferrer');
+                  } else {
+                    window.alert('Результат ещё не готов. Он появится после завершения обработки.');
+                  }
+                }}
+              >
+                <span className="cabinet-lab-card__date">{item.displayDate}</span>
+                <span className="cabinet-lab-card__title">{item.title} ({item.statusLabel})</span>
+              </button>
             ))}
           </div>
         </div>
@@ -409,32 +528,20 @@ export default function Cabinet() {
           <h2>Медкарта</h2>
           <p className="cabinet-hint">Заполните подробную информацию о себе.</p>
           <form className="cabinet-medcard-form" onSubmit={handleMedcardSave}>
-            <label className="cabinet-medcard-field">
-              <span>Рост (см)</span>
-              <input
-                type="number"
-                min="50"
-                max="300"
-                name="height"
-                value={medcardForm.height}
-                onChange={handleMedcardChange}
-              />
-            </label>
-            <label className="cabinet-medcard-field">
-              <span>Вес (кг)</span>
-              <input
-                type="number"
-                min="20"
-                max="500"
-                name="weight"
-                value={medcardForm.weight}
-                onChange={handleMedcardChange}
-              />
-            </label>
+            {[
+              ['height', 'Рост (см)', 'number'],
+              ['weight', 'Вес (кг)', 'number'],
+              ['age', 'Возраст', 'number'],
+            ].map(([name, label, type]) => (
+              <label className="cabinet-medcard-field" key={name}>
+                <span>{label}</span>
+                <input type={type} name={name} value={medcardForm[name]} onChange={handleMedcardChange} />
+              </label>
+            ))}
             <label className="cabinet-medcard-field">
               <span>Группа крови</span>
               <select name="bloodGroup" value={medcardForm.bloodGroup} onChange={handleMedcardChange}>
-                <option value="" disabled hidden />
+                <option value="">Не выбрано</option>
                 <option value="I">I (O)</option>
                 <option value="II">II (A)</option>
                 <option value="III">III (B)</option>
@@ -444,34 +551,21 @@ export default function Cabinet() {
             <label className="cabinet-medcard-field">
               <span>Резус-фактор</span>
               <select name="rhFactor" value={medcardForm.rhFactor} onChange={handleMedcardChange}>
-                <option value="" disabled hidden />
-                <option value="+">Положительная (+)</option>
-                <option value="-">Отрицательная (-)</option>
+                <option value="">Не выбрано</option>
+                <option value="+">Положительный (+)</option>
+                <option value="-">Отрицательный (-)</option>
               </select>
             </label>
             <label className="cabinet-medcard-field">
               <span>Пол</span>
               <select name="gender" value={medcardForm.gender} onChange={handleMedcardChange}>
-                <option value="" disabled hidden />
+                <option value="">Не выбрано</option>
                 <option value="Мужской">Мужской</option>
                 <option value="Женский">Женский</option>
               </select>
             </label>
-            <label className="cabinet-medcard-field">
-              <span>Возраст</span>
-              <input
-                type="number"
-                min="0"
-                max="130"
-                name="age"
-                value={medcardForm.age}
-                onChange={handleMedcardChange}
-              />
-            </label>
             <div className="cabinet-medcard-actions">
-              <button className="cabinet-refresh" type="submit">
-                Сохранить
-              </button>
+              <button className="cabinet-refresh" type="submit">Сохранить</button>
             </div>
           </form>
           {medcardError ? <p className="cabinet-error">{medcardError}</p> : null}
@@ -487,47 +581,22 @@ export default function Cabinet() {
           <form className="cabinet-medcard-form" onSubmit={handleEditSave}>
             <label className="cabinet-medcard-field">
               <span>Электронная почта</span>
-              <input
-                type="email"
-                name="email"
-                value={editForm.email}
-                onChange={handleEditChange}
-                required
-              />
+              <input type="email" name="email" value={editForm.email} onChange={handleEditChange} required />
             </label>
             <label className="cabinet-medcard-field">
               <span>Новый пароль</span>
-              <input
-                type="password"
-                name="password"
-                value={editForm.password}
-                onChange={handleEditChange}
-                minLength={8}
-                autoComplete="new-password"
-              />
+              <input type="password" name="password" value={editForm.password} onChange={handleEditChange} minLength={8} />
             </label>
             <label className="cabinet-medcard-field">
               <span>Дата рождения</span>
-              <input
-                type="date"
-                name="birthDate"
-                value={editForm.birthDate}
-                onChange={handleEditChange}
-              />
+              <input type="date" name="birthDate" value={editForm.birthDate} onChange={handleEditChange} />
             </label>
             <label className="cabinet-medcard-field">
               <span>Адрес</span>
-              <input
-                type="text"
-                name="address"
-                value={editForm.address}
-                onChange={handleEditChange}
-              />
+              <input type="text" name="address" value={editForm.address} onChange={handleEditChange} />
             </label>
             <div className="cabinet-medcard-actions">
-              <button className="cabinet-refresh" type="submit">
-                Сохранить изменения
-              </button>
+              <button className="cabinet-refresh" type="submit">Сохранить изменения</button>
             </div>
           </form>
           {editError ? <p className="cabinet-error">{editError}</p> : null}
@@ -547,20 +616,19 @@ export default function Cabinet() {
           {error ? <p className="cabinet-error">{error}</p> : null}
         </div>
         <div className="cabinet-actions">
-          <button className="cabinet-refresh" type="button" onClick={loadCabinet}>
-            Обновить
-          </button>
-          <button className="cabinet-logout" type="button" onClick={logout}>
-            Выйти
-          </button>
+          <button className="cabinet-refresh" type="button" onClick={loadCabinet}>Обновить</button>
+          <button className="cabinet-logout" type="button" onClick={logout}>Выйти</button>
         </div>
       </div>
 
       <div className="cabinet-layout">
         <aside className="cabinet-menu">
           <NavLink className="cabinet-menu-item" to="/cabinet/info">Общая информация</NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/notifications">
+            Уведомления{unreadNotifications.length ? ` (${unreadNotifications.length})` : ''}
+          </NavLink>
           <NavLink className="cabinet-menu-item" to="/cabinet/services">Мои записи и услуги</NavLink>
-          <NavLink className="cabinet-menu-item" to="/cabinet/visits">Мои приемы</NavLink>
+          <NavLink className="cabinet-menu-item" to="/cabinet/visits">Мои приёмы</NavLink>
           <NavLink className="cabinet-menu-item" to="/cabinet/labs">Результаты анализов</NavLink>
           <NavLink className="cabinet-menu-item" to="/cabinet/medcard">Медкарта</NavLink>
           <NavLink className="cabinet-menu-item" to="/cabinet/edit">Редактировать данные</NavLink>

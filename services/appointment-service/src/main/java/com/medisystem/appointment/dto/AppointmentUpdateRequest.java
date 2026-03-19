@@ -3,6 +3,7 @@ package com.medisystem.appointment.dto;
 import com.medisystem.appointment.entity.AppointmentStatus;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -12,6 +13,9 @@ public record AppointmentUpdateRequest(
         @NotNull LocalDate appointmentDate,
         @NotNull LocalTime appointmentTime,
         @NotNull AppointmentStatus status,
-        String notes
+        String notes,
+        @NotNull String serviceName,
+        BigDecimal servicePrice,
+        String serviceCurrency
 ) {
 }

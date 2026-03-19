@@ -137,6 +137,13 @@
   box-shadow: 0 16px 34px rgba(240, 141, 34, 0.22);
 }
 
+.appointments-secondary-action--small {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
 .appointments-primary-action:hover,
 .appointments-secondary-action:hover,
 .appointments-submit-action:hover {

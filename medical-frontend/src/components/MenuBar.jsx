@@ -6,7 +6,7 @@ export default function MenuBar() {
   return (
     <nav className="menu-bar">
       <div className="menu-bar-content">
-        <NavLink to="/appointments" className={getMenuItemClassName}>
+        <NavLink to="/services" className={getMenuItemClassName}>
           Услуги и цены
         </NavLink>
         <NavLink to="/doctors" className={getMenuItemClassName}>

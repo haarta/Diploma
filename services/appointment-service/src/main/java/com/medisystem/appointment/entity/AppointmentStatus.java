@@ -2,6 +2,8 @@ package com.medisystem.appointment.entity;
 
 public enum AppointmentStatus {
     SCHEDULED,
+    CONFIRMED,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    NO_SHOW
 }

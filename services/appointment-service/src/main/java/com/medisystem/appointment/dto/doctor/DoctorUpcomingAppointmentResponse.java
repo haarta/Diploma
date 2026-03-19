@@ -7,9 +7,13 @@ public record DoctorUpcomingAppointmentResponse(
         Long id,
         Long patientId,
         Long doctorId,
+        String patientFullName,
+        String patientEmail,
         LocalDate appointmentDate,
         LocalTime appointmentTime,
         String status,
-        String notes
+        String notes,
+        String serviceName,
+        String completionSummary
 ) {
 }

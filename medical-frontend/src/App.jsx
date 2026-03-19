@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Patients from './pages/Patients';
 import Doctors from './pages/Doctors';
 import Appointments from './pages/Appointments';
+import ServicesCatalog from './pages/ServicesCatalog';
 import Cabinet from './pages/Cabinet';
 import DoctorCabinet from './pages/DoctorCabinet';
 import DoctorVerificationRequest from './pages/DoctorVerificationRequest';
@@ -61,6 +62,7 @@ export default function App() {
                 )}
               />
               <Route path="/doctors" element={<Doctors />} />
+              <Route path="/services" element={<ServicesCatalog />} />
               <Route path="/online-consultations" element={<OnlineConsultations />} />
               <Route path="/promotions" element={<Promotions />} />
               <Route path="/appointments" element={<Appointments />} />

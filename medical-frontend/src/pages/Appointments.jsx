@@ -259,6 +259,8 @@ export default function Appointments() {
         value: `${price.serviceName}-${index}`,
         label: `${price.serviceName}${price.amount ? ` · ${price.amount} ${price.currency || 'RUB'}` : ''}`,
         serviceName: price.serviceName,
+        amount: price.amount,
+        currency: price.currency || 'RUB',
       }));
   }, [selectedDoctor]);
 
@@ -368,23 +370,18 @@ export default function Appointments() {
         patientId = patientResponse.data?.id;
       }
 
-      const notesParts = [];
-      if (selectedService?.serviceName) {
-        notesParts.push(`Услуга: ${selectedService.serviceName}`);
-      }
-      if (bookingForm.notes.trim()) {
-        notesParts.push(bookingForm.notes.trim());
-      }
-
       return appointmentsApi.createMine({
         patientId: Number(patientId),
         doctorId: Number(selectedDoctor.id),
         appointmentDate: bookingForm.appointmentDate,
         appointmentTime: bookingForm.appointmentTime,
         status: 'SCHEDULED',
-        notes: notesParts.join('\n') || null,
+        notes: bookingForm.notes.trim() || null,
         patientFullName: bookingForm.fullName.trim() || currentPatient?.fullName || '',
         patientEmail: bookingForm.email.trim() || currentPatient?.email || '',
+        serviceName: selectedService?.serviceName || 'Консультация',
+        servicePrice: selectedService?.amount ?? null,
+        serviceCurrency: selectedService?.currency || 'RUB',
       });
     },
     onSuccess: () => {
@@ -401,6 +398,23 @@ export default function Appointments() {
         error?.response?.data?.message ||
         error?.message ||
         'Не удалось оформить запись.';
+      window.alert(serverMessage);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (appointmentId) => appointmentsApi.cancelMine(appointmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['doctor-busy-slots'] });
+      window.alert('Запись отменена.');
+    },
+    onError: (error) => {
+      const serverMessage =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Не удалось отменить запись.';
       window.alert(serverMessage);
     },
   });
@@ -762,6 +776,7 @@ export default function Appointments() {
                   <th>Дата</th>
                   <th>Время</th>
                   <th>Статус</th>
+                  <th>Действие</th>
                 </tr>
               </thead>
               <tbody>
@@ -778,6 +793,22 @@ export default function Appointments() {
                         <span className={statusClasses[appointment.status] || 'status status--info'}>
                           {statusLabels[appointment.status] || appointment.status}
                         </span>
+                      </td>
+                      <td>
+                        {appointment.status === 'SCHEDULED' ? (
+                          <button
+                            type="button"
+                            className="appointments-secondary-action appointments-secondary-action--small"
+                            onClick={() => {
+                              if (window.confirm('Отменить эту запись?')) {
+                                cancelMutation.mutate(appointment.id);
+                              }
+                            }}
+                            disabled={cancelMutation.isPending}
+                          >
+                            Отменить
+                          </button>
+                        ) : '—'}
                       </td>
                     </tr>
                   );

@@ -1,4 +1,4 @@
-package com.medisystem.appointment.config;
+package com.medisystem.notification.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

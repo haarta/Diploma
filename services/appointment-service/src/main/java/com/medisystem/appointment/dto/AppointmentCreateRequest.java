@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.math.BigDecimal;
 
 public record AppointmentCreateRequest(
         @NotNull Long patientId,
@@ -16,6 +17,9 @@ public record AppointmentCreateRequest(
         AppointmentStatus status,
         String notes,
         String patientFullName,
-        @NotBlank @Email String patientEmail
+        @NotBlank @Email String patientEmail,
+        @NotBlank String serviceName,
+        BigDecimal servicePrice,
+        String serviceCurrency
 ) {
 }

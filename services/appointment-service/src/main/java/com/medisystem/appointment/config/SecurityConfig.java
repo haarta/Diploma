@@ -14,7 +14,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({AuthProperties.class, StorageProperties.class, MailProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, StorageProperties.class})
 public class SecurityConfig {
 
     @Bean

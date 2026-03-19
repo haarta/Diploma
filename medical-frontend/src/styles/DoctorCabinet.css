@@ -70,10 +70,16 @@
 }
 
 .doctor-upload-form input,
-.doctor-upload-form select {
+.doctor-upload-form select,
+.doctor-upload-form textarea {
   border: 1px solid #d6d6d6;
   border-radius: 8px;
   padding: 8px 10px;
+}
+
+.doctor-upload-form textarea {
+  resize: vertical;
+  min-height: 72px;
 }
 
 .doctor-doc-list {
