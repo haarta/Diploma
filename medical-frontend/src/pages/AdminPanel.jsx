@@ -2,6 +2,7 @@
 import AdminDoctors from './AdminDoctors';
 import AdminDoctorVerifications from './AdminDoctorVerifications';
 import AdminAnalytics from './AdminAnalytics';
+import AdminNews from './AdminNews';
 import AdminOnlineConsultations from './AdminOnlineConsultations';
 import AdminPromotions from './AdminPromotions';
 
@@ -32,6 +33,9 @@ export default function AdminPanel() {
             <NavLink to="/admin/promotions" className={getTabClassName}>
               Акции
             </NavLink>
+            <NavLink to="/admin/news" className={getTabClassName}>
+              Новости
+            </NavLink>
           </div>
         </div>
 
@@ -42,6 +46,7 @@ export default function AdminPanel() {
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="online-consultations" element={<AdminOnlineConsultations />} />
           <Route path="promotions" element={<AdminPromotions />} />
+          <Route path="news" element={<AdminNews />} />
           <Route path="*" element={<Navigate to="/admin/doctors" replace />} />
         </Routes>
       </section>

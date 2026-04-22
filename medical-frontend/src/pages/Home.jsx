@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { promotionsApi } from '../api';
+import { newsApi, promotionsApi } from '../api';
+import ExpandableNewsCard from '../components/ExpandableNewsCard';
 
-const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
+const promotionDateFormatter = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
 });
@@ -17,7 +19,7 @@ const formatDate = (value) => {
     return value;
   }
 
-  return dateFormatter.format(date);
+  return promotionDateFormatter.format(date);
 };
 
 const formatPromotionPeriod = (promotion) => {
@@ -53,6 +55,18 @@ function PromotionPreviewCard({ promotion }) {
 }
 
 export default function Home() {
+  const newsViewportRef = useRef(null);
+  const [visibleNewsCount, setVisibleNewsCount] = useState(1);
+  const [newsStartIndex, setNewsStartIndex] = useState(0);
+
+  const { data: newsItems = [], isLoading: newsLoading } = useQuery({
+    queryKey: ['public-news'],
+    queryFn: async () => {
+      const response = await newsApi.getAll();
+      return response.data || [];
+    },
+  });
+
   const { data: promotions = [] } = useQuery({
     queryKey: ['public-promotions'],
     queryFn: async () => {
@@ -60,6 +74,61 @@ export default function Home() {
       return response.data || [];
     },
   });
+
+  useEffect(() => {
+    const viewport = newsViewportRef.current;
+
+    if (!viewport) {
+      return undefined;
+    }
+
+    const updateVisibleNewsCount = () => {
+      if (newsItems.length === 0) {
+        setVisibleNewsCount(0);
+        setNewsStartIndex(0);
+        return;
+      }
+
+      const width = viewport.clientWidth;
+      const gap = width <= 760 ? 16 : 24;
+      const minCardWidth = width <= 760 ? 280 : 320;
+      const nextVisibleCount = Math.max(
+        1,
+        Math.min(newsItems.length, Math.floor((width + gap) / (minCardWidth + gap))),
+      );
+
+      setVisibleNewsCount(nextVisibleCount);
+      setNewsStartIndex((currentIndex) => Math.min(currentIndex, Math.max(0, newsItems.length - nextVisibleCount)));
+    };
+
+    updateVisibleNewsCount();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateVisibleNewsCount);
+      return () => window.removeEventListener('resize', updateVisibleNewsCount);
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateVisibleNewsCount();
+    });
+
+    resizeObserver.observe(viewport);
+
+    return () => resizeObserver.disconnect();
+  }, [newsItems.length]);
+
+  const maxNewsStartIndex = Math.max(0, newsItems.length - visibleNewsCount);
+  const visibleNewsItems = visibleNewsCount > 0
+    ? newsItems.slice(newsStartIndex, newsStartIndex + visibleNewsCount)
+    : [];
+
+  const showPreviousNews = () => {
+    setNewsStartIndex((currentIndex) => Math.max(0, currentIndex - visibleNewsCount));
+  };
+
+  const showNextNews = () => {
+    setNewsStartIndex((currentIndex) => Math.min(maxNewsStartIndex, currentIndex + visibleNewsCount));
+  };
 
   return (
     <div className="home">
@@ -96,25 +165,51 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="services">
-        <h2>Основные сервисы</h2>
-        <div className="services-grid">
-          <div className="service-item">
-            <h4>Карточки пациентов</h4>
-            <p>Ведение профилей пациентов, контактных данных и базовой медицинской информации.</p>
-            <Link to="/patients" className="btn btn-secondary btn-small">Перейти</Link>
+      <section className="news-ribbon">
+        <div className="news-ribbon__header">
+          <div>
+            <span className="news-ribbon__eyebrow">Новости</span>
+            <h2>Что нового в клинике</h2>
+            <p>Анонсы программ, изменения в расписании и короткие обновления, которые можно быстро пролистать.</p>
           </div>
-          <div className="service-item">
-            <h4>Справочник врачей</h4>
-            <p>Информация о врачах, их специальностях, лицензиях и доступности для записи.</p>
-            <Link to="/doctors" className="btn btn-secondary btn-small">Перейти</Link>
-          </div>
-          <div className="service-item">
-            <h4>Запись на прием</h4>
-            <p>Бронирование времени у врача, управление статусами записи и история обращений.</p>
-            <Link to="/appointments" className="btn btn-secondary btn-small">Перейти</Link>
-          </div>
+          <Link to="/news" className="btn btn-secondary">Все новости</Link>
         </div>
+
+        {newsLoading ? (
+          <div className="news-ribbon__state">Загрузка новостей...</div>
+        ) : newsItems.length === 0 ? (
+          <div className="news-ribbon__state">Опубликованных новостей пока нет.</div>
+        ) : (
+          <div className="news-ribbon__carousel">
+            <button
+              type="button"
+              className="news-ribbon__nav news-ribbon__nav--prev"
+              onClick={showPreviousNews}
+              aria-label="Прокрутить новости назад"
+              disabled={newsStartIndex === 0}
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+
+            <div className="news-ribbon__viewport" ref={newsViewportRef}>
+              <div className="news-ribbon__track" style={{ '--news-visible-count': visibleNewsItems.length || 1 }}>
+                {visibleNewsItems.map((item) => (
+                  <ExpandableNewsCard key={item.id} item={item} variant="ribbon" />
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="news-ribbon__nav news-ribbon__nav--next"
+              onClick={showNextNews}
+              aria-label="Прокрутить новости вперед"
+              disabled={newsStartIndex >= maxNewsStartIndex}
+            >
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="home-promotions">
@@ -198,40 +293,113 @@ export default function Home() {
           margin-bottom: 10px;
         }
 
-        .services {
-          margin-bottom: 40px;
+        .news-ribbon {
+          margin-bottom: 48px;
+          padding: 28px 0 8px;
         }
 
-        .services h2 {
-          text-align: center;
-          color: #7f62c9;
-          margin-bottom: 30px;
-          font-size: 1.8em;
-        }
-
-        .services-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        .news-ribbon__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
           gap: 20px;
+          margin-bottom: 26px;
+          flex-wrap: wrap;
         }
 
-        .service-item {
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 239, 255, 0.96));
-          padding: 20px;
-          border-radius: 18px;
-          border-left: 4px solid #9b7ae8;
-          box-shadow: 0 10px 24px rgba(123, 109, 156, 0.08);
+        .news-ribbon__eyebrow {
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 14px;
+          border-radius: 999px;
+          margin-bottom: 12px;
+          background: rgba(249, 131, 52, 0.12);
+          color: #d86d20;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-        .service-item h4 {
-          color: #7f62c9;
+        .news-ribbon__header h2 {
           margin-bottom: 10px;
+          color: #352b4e;
+          font-size: clamp(2rem, 3vw, 2.6rem);
+          font-weight: 500;
         }
 
-        .service-item p {
+        .news-ribbon__header p {
+          max-width: 720px;
+          margin: 0;
           color: #6b6280;
-          margin-bottom: 15px;
-          font-size: 0.95em;
+          font-size: 1rem;
+          line-height: 1.6;
+        }
+
+        .news-ribbon__state {
+          padding: 28px;
+          border-radius: 24px;
+          background: rgba(255, 255, 255, 0.88);
+          border: 1px solid rgba(125, 151, 196, 0.14);
+          color: #5f6475;
+        }
+
+        .news-ribbon__carousel {
+          display: grid;
+          grid-template-columns: 52px minmax(0, 1fr) 52px;
+          gap: 18px;
+          align-items: center;
+        }
+
+        .news-ribbon__viewport {
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .news-ribbon__track {
+          display: grid;
+          grid-template-columns: repeat(var(--news-visible-count), minmax(0, 1fr));
+          gap: 24px;
+          padding: 4px 2px 16px;
+        }
+
+        .news-ribbon__nav {
+          width: 52px;
+          height: 52px;
+          border: 1px solid rgba(53, 43, 78, 0.18);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.92);
+          color: #352b4e;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 12px 26px rgba(53, 43, 78, 0.08);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .news-ribbon__nav:hover {
+          transform: translateY(-2px);
+          border-color: rgba(53, 43, 78, 0.32);
+          box-shadow: 0 16px 32px rgba(53, 43, 78, 0.12);
+        }
+
+        .news-ribbon__nav:disabled {
+          cursor: default;
+          opacity: 0.45;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .news-ribbon__nav:disabled:hover {
+          border-color: rgba(53, 43, 78, 0.18);
+          box-shadow: none;
+        }
+
+        .news-ribbon__nav span {
+          font-size: 30px;
+          line-height: 1;
+          transform: translateY(-1px);
         }
 
         .home-promotions {
@@ -312,7 +480,25 @@ export default function Home() {
           font-weight: 600;
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 760px) {
+          .news-ribbon {
+            padding-top: 10px;
+          }
+
+          .news-ribbon__carousel {
+            grid-template-columns: 44px minmax(0, 1fr) 44px;
+            gap: 12px;
+          }
+
+          .news-ribbon__track {
+            gap: 16px;
+          }
+
+          .news-ribbon__nav {
+            width: 44px;
+            height: 44px;
+          }
+
           .promotion-preview-card {
             grid-template-columns: 1fr;
           }

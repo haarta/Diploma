@@ -156,6 +156,11 @@ export const promotionsApi = {
   getById: (id) => api.get(`/public/promotions/${id}`),
 };
 
+export const newsApi = {
+  getAll: () => api.get('/public/news'),
+  getById: (id) => api.get(`/public/news/${id}`),
+};
+
 export const onlineConsultationsApi = {
   getAll: () => api.get('/public/online-consultations'),
   getById: (id) => api.get(`/public/online-consultations/${id}`),
@@ -175,6 +180,14 @@ export const adminPromotionsApi = {
   create: (data) => api.post('/admin/promotions', data, withAuth()),
   update: (id, data) => api.put(`/admin/promotions/${id}`, data, withAuth()),
   delete: (id) => api.delete(`/admin/promotions/${id}`, withAuth()),
+};
+
+export const adminNewsApi = {
+  getAll: () => api.get('/admin/news', withAuth()),
+  getById: (id) => api.get(`/admin/news/${id}`, withAuth()),
+  create: (data) => api.post('/admin/news', data, withAuth()),
+  update: (id, data) => api.put(`/admin/news/${id}`, data, withAuth()),
+  delete: (id) => api.delete(`/admin/news/${id}`, withAuth()),
 };
 
 export const adminOnlineConsultationsApi = {

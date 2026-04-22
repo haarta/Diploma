@@ -12,6 +12,7 @@ import Cabinet from './pages/Cabinet';
 import DoctorCabinet from './pages/DoctorCabinet';
 import DoctorVerificationRequest from './pages/DoctorVerificationRequest';
 import OnlineConsultations from './pages/OnlineConsultations';
+import News from './pages/News';
 import Promotions from './pages/Promotions';
 import AdminPanel from './pages/AdminPanel';
 import { getAccessToken, isAdmin, isDoctor } from './auth';
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="/doctors" element={<Doctors />} />
               <Route path="/services" element={<ServicesCatalog />} />
               <Route path="/online-consultations" element={<OnlineConsultations />} />
+              <Route path="/news" element={<News />} />
               <Route path="/promotions" element={<Promotions />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route
