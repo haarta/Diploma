@@ -23,7 +23,7 @@ public class FileStorageService {
 
     public FileUploadResponse upload(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File is required");
+            throw new IllegalArgumentException("Необходимо выбрать файл");
         }
 
         String safeFolder = normalizeFolder(folder);
@@ -40,7 +40,7 @@ public class FileStorageService {
                             .build()
             );
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to upload file to object storage", ex);
+            throw new IllegalStateException("Не удалось загрузить файл в объектное хранилище", ex);
         }
 
         String publicUrl = trimTrailingSlash(storage.publicUrl());

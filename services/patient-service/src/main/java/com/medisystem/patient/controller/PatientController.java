@@ -125,6 +125,8 @@ public class PatientController {
                 p.getChronicConditions(),
                 p.getBloodGroup(),
                 p.getRhFactor(),
+                p.getHeightCm(),
+                p.getWeightKg(),
                 p.getEmergencyContactName(),
                 p.getEmergencyContactPhone(),
                 p.isActive(),

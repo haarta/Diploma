@@ -1,10 +1,14 @@
 package com.medisystem.patient.dto;
 
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public class PatientCreateRequest {
@@ -41,6 +45,13 @@ public class PatientCreateRequest {
 
     @Size(max = 8)
     public String rhFactor;
+
+    @Max(value = 300, message = "heightCm must be less than or equal to 300")
+    public Integer heightCm;
+
+    @DecimalMin(value = "1.0", message = "weightKg must be greater than or equal to 1.0")
+    @DecimalMax(value = "500.0", message = "weightKg must be less than or equal to 500.0")
+    public BigDecimal weightKg;
 
     @Size(max = 255)
     public String emergencyContactName;

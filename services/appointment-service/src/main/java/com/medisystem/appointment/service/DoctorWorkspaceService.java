@@ -76,9 +76,9 @@ public class DoctorWorkspaceService {
     ) {
         Doctor doctor = findDoctorByUserId(userId);
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new IllegalArgumentException("Appointment not found: " + appointmentId));
+                .orElseThrow(() -> new IllegalArgumentException("Прием не найден: " + appointmentId));
         if (!appointment.getDoctorId().equals(doctor.getId())) {
-            throw new IllegalArgumentException("Appointment does not belong to current doctor");
+            throw new IllegalArgumentException("Этот прием не относится к текущему врачу");
         }
 
         AppointmentStatus nextStatus = parseDoctorStatus(request.status());
@@ -147,14 +147,14 @@ public class DoctorWorkspaceService {
         Doctor doctor = findDoctorByUserId(userId);
 
         Appointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new IllegalArgumentException("Appointment not found: " + appointmentId));
+                .orElseThrow(() -> new IllegalArgumentException("Прием не найден: " + appointmentId));
         if (!appointment.getDoctorId().equals(doctor.getId())) {
-            throw new IllegalArgumentException("Appointment does not belong to current doctor");
+            throw new IllegalArgumentException("Этот прием не относится к текущему врачу");
         }
 
         String mimeType = file == null ? null : file.getContentType();
         if (mimeType == null || !ALLOWED_MIME_TYPES.contains(mimeType.toLowerCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("Unsupported file type. Allowed: PDF, PNG, JPG, WEBP");
+            throw new IllegalArgumentException("Неподдерживаемый тип файла. Допустимы: PDF, PNG, JPG, WEBP");
         }
 
         String normalizedType = normalizeDocumentType(documentType);
@@ -187,7 +187,7 @@ public class DoctorWorkspaceService {
 
     private Doctor findDoctorByUserId(long userId) {
         return doctorRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Doctor profile is not linked to this account"));
+                .orElseThrow(() -> new IllegalArgumentException("Профиль врача не привязан к этой учетной записи"));
     }
 
     private String normalizeDocumentType(String value) {
@@ -228,13 +228,13 @@ public class DoctorWorkspaceService {
 
     private AppointmentStatus parseDoctorStatus(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Status is required");
+            throw new IllegalArgumentException("Необходимо указать статус");
         }
         AppointmentStatus status = AppointmentStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
         if (status != AppointmentStatus.CONFIRMED
                 && status != AppointmentStatus.COMPLETED
                 && status != AppointmentStatus.NO_SHOW) {
-            throw new IllegalArgumentException("Doctor can set only CONFIRMED, COMPLETED or NO_SHOW");
+            throw new IllegalArgumentException("Врач может установить только статусы «подтвержден», «завершен» или «неявка»");
         }
         return status;
     }

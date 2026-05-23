@@ -4,11 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record AdminNewsItemUpsertRequest(
-        @NotBlank(message = "must not be blank")
+        @NotBlank(message = "Поле обязательно для заполнения")
         @Size(max = 255, message = "length must be <= 255")
         String title,
 
-        @NotBlank(message = "must not be blank")
+        @NotBlank(message = "Поле обязательно для заполнения")
         String shortDescription,
 
         @Size(max = 120, message = "length must be <= 120")

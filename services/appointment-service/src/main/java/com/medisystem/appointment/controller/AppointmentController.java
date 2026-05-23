@@ -1,6 +1,7 @@
 package com.medisystem.appointment.controller;
 
 import com.medisystem.appointment.dto.AppointmentCreateRequest;
+import com.medisystem.appointment.dto.AppointmentResponse;
 import com.medisystem.appointment.dto.AppointmentUpdateRequest;
 import com.medisystem.appointment.entity.Appointment;
 import com.medisystem.appointment.security.UserPrincipal;
@@ -34,48 +35,52 @@ public class AppointmentController {
     }
 
     @GetMapping("/me")
-    public List<Appointment> getMine(@AuthenticationPrincipal UserPrincipal principal) {
-        return service.getMine(principal.getUserId());
+    public List<AppointmentResponse> getMine(@AuthenticationPrincipal UserPrincipal principal) {
+        return service.getMine(principal.getUserId()).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @PostMapping("/me")
-    public Appointment createMine(
+    public AppointmentResponse createMine(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody AppointmentCreateRequest req
     ) {
-        return service.createMine(principal.getUserId(), req);
+        return toResponse(service.createMine(principal.getUserId(), req));
     }
 
     @PatchMapping("/me/{id}/cancel")
-    public Appointment cancelMine(
+    public AppointmentResponse cancelMine(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id
     ) {
-        return service.cancelMine(principal.getUserId(), id);
+        return toResponse(service.cancelMine(principal.getUserId(), id));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public List<Appointment> getAll() {
-        return service.getAll();
+    public List<AppointmentResponse> getAll() {
+        return service.getAll().stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Appointment getById(@PathVariable Long id) {
-        return service.getById(id);
+    public AppointmentResponse getById(@PathVariable Long id) {
+        return toResponse(service.getById(id));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public Appointment create(@Valid @RequestBody AppointmentCreateRequest req) {
-        return service.create(req);
+    public AppointmentResponse create(@Valid @RequestBody AppointmentCreateRequest req) {
+        return toResponse(service.create(req));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public Appointment update(@PathVariable Long id, @Valid @RequestBody AppointmentUpdateRequest req) {
-        return service.update(id, req);
+    public AppointmentResponse update(@PathVariable Long id, @Valid @RequestBody AppointmentUpdateRequest req) {
+        return toResponse(service.update(id, req));
     }
 
     @DeleteMapping("/{id}")
@@ -83,5 +88,24 @@ public class AppointmentController {
     @ResponseStatus(NO_CONTENT)
     public void delete(@PathVariable Long id) {
         service.delete(id);
+    }
+
+    private AppointmentResponse toResponse(Appointment appointment) {
+        return new AppointmentResponse(
+                appointment.getId(),
+                appointment.getPatientId(),
+                appointment.getPatientFullName(),
+                appointment.getPatientEmail(),
+                appointment.getDoctorId(),
+                appointment.getAppointmentDate(),
+                appointment.getAppointmentTime(),
+                appointment.getServiceName(),
+                appointment.getServicePrice(),
+                appointment.getServiceCurrency(),
+                appointment.getStatus().name(),
+                appointment.getNotes(),
+                appointment.getCompletionSummary(),
+                appointment.getCompletedAt()
+        );
     }
 }

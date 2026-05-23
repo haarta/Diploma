@@ -31,7 +31,7 @@ public class AuthService {
 
     public TokenResponse register(String email, String password) {
         if (users.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException("Email already registered");
+            throw new IllegalArgumentException("Пользователь с таким e-mail уже зарегистрирован");
         }
 
         UserAccount u = new UserAccount();
@@ -45,10 +45,10 @@ public class AuthService {
 
     public TokenResponse login(String email, String password) {
         UserAccount u = users.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new IllegalArgumentException("Неверный e-mail или пароль"));
 
         if (!u.isEnabled() || !encoder.matches(password, u.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new IllegalArgumentException("Неверный e-mail или пароль");
         }
 
         return issueTokens(u);
@@ -58,16 +58,16 @@ public class AuthService {
         Claims c = jwt.parseClaims(refreshTokenJwt);
 
         String typ = c.get("typ", String.class);
-        if (!"refresh".equals(typ)) throw new IllegalArgumentException("Not a refresh token");
+        if (!"refresh".equals(typ)) throw new IllegalArgumentException("Передан некорректный токен обновления");
 
         String jti = c.getId();
         long userId = Long.parseLong(c.getSubject());
 
         RefreshToken stored = refreshRepo.findByJti(jti)
-                .orElseThrow(() -> new IllegalArgumentException("Refresh token not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Токен обновления не найден"));
 
         if (stored.isRevoked() || stored.getExpiresAt().isBefore(Instant.now())) {
-            throw new IllegalArgumentException("Refresh token expired or revoked");
+            throw new IllegalArgumentException("Срок действия токена обновления истек или он был отозван");
         }
 
         // rotation: отзываем старый refresh
@@ -75,7 +75,7 @@ public class AuthService {
         refreshRepo.save(stored);
 
         UserAccount u = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
         return issueTokens(u);
     }
@@ -83,12 +83,12 @@ public class AuthService {
     @Transactional
     public UserAccount updateMe(long userId, String email, String password) {
         UserAccount user = users.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
         if (email != null && !email.isBlank()) {
             String normalizedEmail = email.trim().toLowerCase();
             if (!normalizedEmail.equalsIgnoreCase(user.getEmail()) && users.existsByEmailIgnoreCase(normalizedEmail)) {
-                throw new IllegalArgumentException("Email already registered");
+                throw new IllegalArgumentException("Пользователь с таким e-mail уже зарегистрирован");
             }
             user.setEmail(normalizedEmail);
         }

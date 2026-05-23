@@ -1,5 +1,6 @@
 ﻿import { Link } from 'react-router-dom';
 import AuthModal from './AuthModal';
+import SiteSearch from './SiteSearch';
 import { isAdmin, isDoctor } from '../auth';
 
 export default function Header() {
@@ -13,9 +14,7 @@ export default function Header() {
           Здоровье
         </Link>
 
-        <form className="search-form">
-          <input className="search-input" type="search" placeholder="Поиск по сайту" />
-        </form>
+        <SiteSearch />
 
         <nav>
           <ul className="nav-links">

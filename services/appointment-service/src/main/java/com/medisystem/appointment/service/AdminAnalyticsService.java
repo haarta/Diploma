@@ -80,7 +80,7 @@ public class AdminAnalyticsService {
             workbook.write(outputStream);
             return outputStream.toByteArray();
         } catch (IOException exception) {
-            throw new IllegalStateException("Failed to build Excel export", exception);
+            throw new IllegalStateException("Не удалось сформировать экспорт в Excel", exception);
         }
     }
 
@@ -115,7 +115,7 @@ public class AdminAnalyticsService {
             document.close();
             return outputStream.toByteArray();
         } catch (DocumentException | IOException exception) {
-            throw new IllegalStateException("Failed to build PDF export", exception);
+            throw new IllegalStateException("Не удалось сформировать экспорт в PDF", exception);
         }
     }
 

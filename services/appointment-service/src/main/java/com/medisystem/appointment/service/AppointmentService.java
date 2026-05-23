@@ -11,6 +11,7 @@ import com.medisystem.appointment.exception.AppointmentNotFoundException;
 import com.medisystem.appointment.messaging.AppointmentEventPublisher;
 import com.medisystem.appointment.repo.AppointmentRepository;
 import com.medisystem.appointment.repo.DoctorRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,7 +47,7 @@ public class AppointmentService {
     @Transactional(readOnly = true)
     public Appointment getById(Long id) {
         return repo.findById(id)
-                .orElseThrow(() -> new AppointmentNotFoundException("Appointment not found: " + id));
+                .orElseThrow(() -> new AppointmentNotFoundException("Прием не найден: " + id));
     }
 
     @Transactional
@@ -65,7 +66,7 @@ public class AppointmentService {
         appointment.setServiceCurrency(normalizeCurrency(req.serviceCurrency()));
         appointment.setStatus(req.status() == null ? AppointmentStatus.SCHEDULED : req.status());
         appointment.setNotes(req.notes());
-        Appointment saved = repo.save(appointment);
+        Appointment saved = persistAppointment(appointment);
         appointmentEventPublisher.publishCreated(saved, doctor, req.patientEmail(), req.patientFullName());
         if (saved.getCreatedByUserId() != null) {
             userNotificationService.createNotification(
@@ -91,7 +92,7 @@ public class AppointmentService {
         LocalDate rangeStart = dateFrom == null ? LocalDate.now() : dateFrom;
         LocalDate rangeEnd = dateTo == null ? rangeStart : dateTo;
         if (rangeEnd.isBefore(rangeStart)) {
-            throw new IllegalArgumentException("dateTo must be greater than or equal to dateFrom");
+            throw new IllegalArgumentException("Дата окончания периода не может быть раньше даты начала");
         }
         return repo.findAllByDoctorIdAndAppointmentDateBetweenAndStatusNotOrderByAppointmentDateAscAppointmentTimeAsc(
                         doctorId,
@@ -125,7 +126,7 @@ public class AppointmentService {
         appointment.setServiceCurrency(normalizeCurrency(req.serviceCurrency()));
         appointment.setStatus(AppointmentStatus.SCHEDULED);
         appointment.setNotes(req.notes());
-        Appointment saved = repo.save(appointment);
+        Appointment saved = persistAppointment(appointment);
         appointmentEventPublisher.publishCreated(saved, doctor, req.patientEmail(), req.patientFullName());
         return saved;
     }
@@ -135,13 +136,13 @@ public class AppointmentService {
         Appointment appointment = getById(appointmentId);
 
         if (appointment.getCreatedByUserId() == null || !appointment.getCreatedByUserId().equals(userId)) {
-            throw new IllegalArgumentException("You can cancel only your own appointment");
+            throw new IllegalArgumentException("Можно отменить только собственную запись");
         }
         if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
             return appointment;
         }
         if (appointment.getStatus() == AppointmentStatus.COMPLETED || appointment.getStatus() == AppointmentStatus.NO_SHOW) {
-            throw new IllegalArgumentException("Completed appointment cannot be cancelled");
+            throw new IllegalArgumentException("Завершенный прием нельзя отменить");
         }
 
         appointment.setStatus(AppointmentStatus.CANCELLED);
@@ -172,7 +173,7 @@ public class AppointmentService {
         appointment.setServiceCurrency(normalizeCurrency(req.serviceCurrency()));
         appointment.setStatus(req.status());
         appointment.setNotes(req.notes());
-        return repo.save(appointment);
+        return persistAppointment(appointment);
     }
 
     @Transactional
@@ -201,36 +202,40 @@ public class AppointmentService {
 
     private Doctor requireDoctor(Long doctorId) {
         return doctorRepository.findById(doctorId)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor not found: " + doctorId));
+                .orElseThrow(() -> new DoctorNotFoundException("Врач не найден: " + doctorId));
     }
 
     private void ensureAppointmentDateTime(LocalDate date, java.time.LocalTime time) {
         if (date == null || time == null) {
-            throw new IllegalArgumentException("Appointment date and time are required");
+            throw new IllegalArgumentException("Необходимо указать дату и время приема");
         }
         if (LocalDateTime.of(date, time).isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Appointment must be scheduled in the future");
+            throw new IllegalArgumentException("Запись на прием должна быть оформлена на будущую дату и время");
         }
     }
 
     private void ensureSlotIsFree(Long doctorId, LocalDate date, java.time.LocalTime time, Long currentAppointmentId) {
-        boolean occupied = repo.findAllByDoctorIdAndAppointmentDateAndStatusNotOrderByAppointmentTimeAsc(
-                        doctorId,
-                        date,
-                        AppointmentStatus.CANCELLED
-                ).stream()
-                .anyMatch(item ->
-                        item.getAppointmentTime().equals(time)
-                                && (currentAppointmentId == null || !item.getId().equals(currentAppointmentId))
-                );
+        boolean occupied = repo.existsByDoctorIdAndAppointmentDateAndAppointmentTimeAndStatusNot(
+                doctorId,
+                date,
+                time,
+                AppointmentStatus.CANCELLED
+        );
+        if (occupied && currentAppointmentId != null) {
+            Appointment current = getById(currentAppointmentId);
+            occupied = !doctorId.equals(current.getDoctorId())
+                    || !date.equals(current.getAppointmentDate())
+                    || !time.equals(current.getAppointmentTime())
+                    || current.getStatus() == AppointmentStatus.CANCELLED;
+        }
         if (occupied) {
-            throw new IllegalArgumentException("Selected appointment slot is already booked");
+            throw new IllegalArgumentException("Выбранный слот уже занят");
         }
     }
 
     private void ensureServiceName(String serviceName) {
         if (serviceName == null || serviceName.isBlank()) {
-            throw new IllegalArgumentException("Service name is required");
+            throw new IllegalArgumentException("Необходимо указать название услуги");
         }
     }
 
@@ -239,5 +244,13 @@ public class AppointmentService {
             return "RUB";
         }
         return currency.trim().toUpperCase();
+    }
+
+    private Appointment persistAppointment(Appointment appointment) {
+        try {
+            return repo.save(appointment);
+        } catch (DataIntegrityViolationException ex) {
+            throw new IllegalArgumentException("Выбранный слот уже занят");
+        }
     }
 }

@@ -1,0 +1,5 @@
+ALTER TABLE patients
+    ADD COLUMN IF NOT EXISTS height_cm INTEGER;
+
+ALTER TABLE patients
+    ADD COLUMN IF NOT EXISTS weight_kg NUMERIC(5,2);

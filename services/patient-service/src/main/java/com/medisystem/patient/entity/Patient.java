@@ -11,6 +11,7 @@ import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -58,6 +59,12 @@ public class Patient {
     @Column(name = "rh_factor")
     private String rhFactor;
 
+    @Column(name = "height_cm")
+    private Integer heightCm;
+
+    @Column(name = "weight_kg", precision = 5, scale = 2)
+    private BigDecimal weightKg;
+
     @Column(name = "emergency_contact_name")
     private String emergencyContactName;
 
@@ -80,7 +87,7 @@ public class Patient {
 
     public Patient(Long userId, String fullName, LocalDate birthDate, String phone, String email, String gender,
                    String address, String allergies, String chronicConditions, String bloodGroup, String rhFactor,
-                   String emergencyContactName, String emergencyContactPhone) {
+                   String emergencyContactName, String emergencyContactPhone, Integer heightCm, BigDecimal weightKg) {
         this.userId = userId;
         this.fullName = fullName;
         this.birthDate = birthDate;
@@ -94,6 +101,8 @@ public class Patient {
         this.rhFactor = rhFactor;
         this.emergencyContactName = emergencyContactName;
         this.emergencyContactPhone = emergencyContactPhone;
+        this.heightCm = heightCm;
+        this.weightKg = weightKg;
         this.active = true;
     }
 
@@ -143,6 +152,14 @@ public class Patient {
 
     public String getRhFactor() {
         return rhFactor;
+    }
+
+    public Integer getHeightCm() {
+        return heightCm;
+    }
+
+    public BigDecimal getWeightKg() {
+        return weightKg;
     }
 
     public String getEmergencyContactName() {
@@ -207,6 +224,14 @@ public class Patient {
 
     public void setRhFactor(String rhFactor) {
         this.rhFactor = rhFactor;
+    }
+
+    public void setHeightCm(Integer heightCm) {
+        this.heightCm = heightCm;
+    }
+
+    public void setWeightKg(BigDecimal weightKg) {
+        this.weightKg = weightKg;
     }
 
     public void setEmergencyContactName(String emergencyContactName) {

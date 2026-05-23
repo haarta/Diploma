@@ -30,7 +30,7 @@ public class NewsService {
     public NewsCardResponse getPublicItem(Long id) {
         NewsItem item = getItem(id);
         if (!item.isPublished()) {
-            throw new NewsItemNotFoundException("News item not found: " + id);
+        throw new NewsItemNotFoundException("Новость не найдена: " + id);
         }
         return toResponse(item);
     }
@@ -68,7 +68,7 @@ public class NewsService {
 
     private NewsItem getItem(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new NewsItemNotFoundException("News item not found: " + id));
+                .orElseThrow(() -> new NewsItemNotFoundException("Новость не найдена: " + id));
     }
 
     private void applyFields(NewsItem item, AdminNewsItemUpsertRequest req) {

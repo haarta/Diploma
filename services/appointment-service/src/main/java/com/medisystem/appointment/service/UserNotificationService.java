@@ -33,9 +33,9 @@ public class UserNotificationService {
     @Transactional
     public UserNotificationResponse markAsRead(long userId, Long notificationId) {
         UserNotification notification = userNotificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + notificationId));
+                .orElseThrow(() -> new IllegalArgumentException("Уведомление не найдено: " + notificationId));
         if (!notification.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("Notification does not belong to current user");
+            throw new IllegalArgumentException("Это уведомление не относится к текущему пользователю");
         }
         if (!notification.isRead()) {
             notification.setRead(true);

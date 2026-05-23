@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   appointmentsApi,
+  authSessionApi,
   doctorsApi,
   labResultsApi,
   notificationsApi,
   patientDocumentsApi,
   patientsApi,
 } from '../api';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  saveAuthTokens,
+} from '../auth';
 import '../styles/Cabinet.css';
-
-const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
-const ACCESS_TOKEN_KEY = 'auth_access_token';
-const REFRESH_TOKEN_KEY = 'auth_refresh_token';
-const MEDCARD_STORAGE_KEY = 'cabinet_medcard';
 
 const STATUS_LABELS = {
   SCHEDULED: 'Запланирована',
@@ -22,6 +23,23 @@ const STATUS_LABELS = {
   COMPLETED: 'Завершена',
   CANCELLED: 'Отменена',
   NO_SHOW: 'Неявка',
+};
+
+const EMPTY_MEDCARD_FORM = {
+  height: '',
+  weight: '',
+  bloodGroup: '',
+  rhFactor: '',
+  gender: '',
+};
+
+const EMPTY_EDIT_FORM = {
+  fullName: '',
+  phone: '',
+  email: '',
+  password: '',
+  birthDate: '',
+  address: '',
 };
 
 function formatTime(value) {
@@ -59,6 +77,14 @@ function calculateAge(value) {
   return age >= 0 ? age : 'не указан';
 }
 
+function normalizeNullableText(value) {
+  if (value == null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  return trimmed || null;
+}
+
 export default function Cabinet() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,34 +97,20 @@ export default function Cabinet() {
   const [labResults, setLabResults] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [patientDocuments, setPatientDocuments] = useState([]);
-  const [medcardForm, setMedcardForm] = useState({
-    height: '',
-    weight: '',
-    bloodGroup: '',
-    rhFactor: '',
-    gender: '',
-    age: '',
-  });
+  const [medcardForm, setMedcardForm] = useState(EMPTY_MEDCARD_FORM);
   const [medcardMessage, setMedcardMessage] = useState('');
   const [medcardError, setMedcardError] = useState('');
-  const [editForm, setEditForm] = useState({
-    email: '',
-    password: '',
-    birthDate: '',
-    address: '',
-  });
+  const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [editMessage, setEditMessage] = useState('');
   const [editError, setEditError] = useState('');
 
   const logout = () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    clearAuthTokens();
     navigate('/?auth=register');
   };
 
   const loadCabinet = async () => {
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!accessToken) {
+    if (!getAccessToken()) {
       logout();
       return;
     }
@@ -107,9 +119,7 @@ export default function Cabinet() {
     setError('');
 
     try {
-      const meResponse = await axios.get(`${AUTH_API_BASE}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const meResponse = await authSessionApi.getMe();
       setProfile(meResponse.data);
     } catch {
       setError('Сессия истекла. Выполните вход заново.');
@@ -162,33 +172,24 @@ export default function Cabinet() {
 
   useEffect(() => {
     setEditForm({
+      fullName: patient?.fullName || '',
+      phone: patient?.phone || '',
       email: profile?.email || '',
       password: '',
       birthDate: patient?.birthDate || '',
       address: patient?.address || '',
     });
-  }, [profile?.email, patient?.birthDate, patient?.address]);
+  }, [patient?.address, patient?.birthDate, patient?.fullName, patient?.phone, profile?.email]);
 
   useEffect(() => {
-    if (!profile?.userId) return;
-
-    let storedByUser = {};
-    try {
-      storedByUser = JSON.parse(localStorage.getItem(MEDCARD_STORAGE_KEY) || '{}');
-    } catch {
-      storedByUser = {};
-    }
-
-    const stored = storedByUser[String(profile.userId)] || {};
     setMedcardForm({
-      height: stored.height || '',
-      weight: stored.weight || '',
-      bloodGroup: stored.bloodGroup || patient?.bloodGroup || '',
-      rhFactor: stored.rhFactor || patient?.rhFactor || '',
-      gender: stored.gender || patient?.gender || '',
-      age: stored.age || '',
+      height: patient?.heightCm != null ? String(patient.heightCm) : '',
+      weight: patient?.weightKg != null ? String(patient.weightKg) : '',
+      bloodGroup: patient?.bloodGroup || '',
+      rhFactor: patient?.rhFactor || '',
+      gender: patient?.gender || '',
     });
-  }, [profile?.userId, patient?.bloodGroup, patient?.rhFactor, patient?.gender]);
+  }, [patient?.bloodGroup, patient?.gender, patient?.heightCm, patient?.rhFactor, patient?.weightKg]);
 
   const handleMedcardChange = (event) => {
     const { name, value } = event.target;
@@ -200,32 +201,24 @@ export default function Cabinet() {
     setMedcardError('');
     setMedcardMessage('');
 
-    let storedByUser = {};
+    if (!patient) {
+      setMedcardError('Сначала создайте профиль пациента в разделе Редактировать данные.');
+      return;
+    }
+
     try {
-      storedByUser = JSON.parse(localStorage.getItem(MEDCARD_STORAGE_KEY) || '{}');
+      await patientsApi.updateMe({
+        gender: medcardForm.gender || null,
+        bloodGroup: medcardForm.bloodGroup || null,
+        rhFactor: medcardForm.rhFactor || null,
+        heightCm: medcardForm.height ? Number(medcardForm.height) : null,
+        weightKg: medcardForm.weight ? Number(medcardForm.weight) : null,
+      });
+      await loadCabinet();
+      setMedcardMessage('Данные медкарты сохранены.');
     } catch {
-      storedByUser = {};
+      setMedcardError('Не удалось сохранить данные медкарты.');
     }
-
-    if (profile?.userId) {
-      storedByUser[String(profile.userId)] = medcardForm;
-      localStorage.setItem(MEDCARD_STORAGE_KEY, JSON.stringify(storedByUser));
-    }
-
-    if (patient) {
-      try {
-        await patientsApi.updateMe({
-          gender: medcardForm.gender || null,
-          bloodGroup: medcardForm.bloodGroup || null,
-          rhFactor: medcardForm.rhFactor || null,
-        });
-      } catch {
-        setMedcardError('Медкарта сохранена локально, но не удалось синхронизировать часть данных с сервером.');
-        return;
-      }
-    }
-
-    setMedcardMessage('Данные медкарты сохранены.');
   };
 
   const handleEditChange = (event) => {
@@ -238,49 +231,64 @@ export default function Cabinet() {
     setEditError('');
     setEditMessage('');
 
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!accessToken) {
+    if (!getAccessToken()) {
       setEditError('Сессия истекла. Выполните вход заново.');
       return;
     }
 
     try {
-      await axios.patch(
-        `${AUTH_API_BASE}/api/auth/me`,
-        { email: editForm.email || null, password: editForm.password || null },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
+      await authSessionApi.updateMe({
+        email: normalizeNullableText(editForm.email),
+        password: normalizeNullableText(editForm.password),
+      });
 
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      const refreshToken = getRefreshToken();
       if (refreshToken) {
-        const refreshResponse = await axios.post(`${AUTH_API_BASE}/api/auth/refresh`, { refreshToken });
-        const { accessToken: nextAccessToken, refreshToken: nextRefreshToken } = refreshResponse.data || {};
-        if (nextAccessToken && nextRefreshToken) {
-          localStorage.setItem(ACCESS_TOKEN_KEY, nextAccessToken);
-          localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-        }
+        const refreshResponse = await authSessionApi.refresh(refreshToken);
+        saveAuthTokens(refreshResponse.data || {});
       }
     } catch {
       setEditError('Не удалось сохранить email или пароль.');
       return;
     }
 
-    if (patient) {
-      try {
-        await patientsApi.updateMe({
-          birthDate: editForm.birthDate || null,
-          email: editForm.email || null,
-          address: editForm.address || null,
-        });
-      } catch {
-        setEditError('Email и пароль сохранены, но не удалось обновить персональные данные.');
-        return;
-      }
-    }
+    try {
+      const patientPayload = {
+        fullName: normalizeNullableText(editForm.fullName),
+        birthDate: editForm.birthDate || null,
+        phone: normalizeNullableText(editForm.phone),
+        email: normalizeNullableText(editForm.email),
+        address: normalizeNullableText(editForm.address),
+      };
 
-    await loadCabinet();
-    setEditForm((prev) => ({ ...prev, password: '' }));
-    setEditMessage('Данные успешно обновлены.');
+      if (patient) {
+        await patientsApi.updateMe(patientPayload);
+      } else {
+        if (!patientPayload.fullName || !patientPayload.phone) {
+          setEditError('Для создания профиля пациента укажите ФИО и телефон.');
+          return;
+        }
+
+        await patientsApi.createMe({
+          ...patientPayload,
+          gender: null,
+          allergies: null,
+          chronicConditions: null,
+          bloodGroup: null,
+          rhFactor: null,
+          emergencyContactName: null,
+          emergencyContactPhone: null,
+          heightCm: null,
+          weightKg: null,
+        });
+      }
+
+      await loadCabinet();
+      setEditForm((prev) => ({ ...prev, password: '' }));
+      setEditMessage('Данные успешно обновлены.');
+    } catch {
+      setEditError('Email и пароль сохранены, но не удалось обновить персональные данные.');
+    }
   };
 
   const cancelAppointment = async (appointmentId) => {
@@ -383,6 +391,7 @@ export default function Cabinet() {
   );
 
   const unreadNotifications = notifications.filter((item) => !item.read);
+  const medcardAge = calculateAge(patient?.birthDate);
 
   const renderContent = () => {
     if (loading) {
@@ -399,6 +408,8 @@ export default function Cabinet() {
           <p><strong>Телефон:</strong> {patient?.phone || 'не указан'}</p>
           <p><strong>Дата рождения:</strong> {formatBirthDate(patient?.birthDate)}</p>
           <p><strong>Возраст:</strong> {calculateAge(patient?.birthDate)}</p>
+          <p><strong>Рост:</strong> {patient?.heightCm ? `${patient.heightCm} см` : 'не указан'}</p>
+          <p><strong>Вес:</strong> {patient?.weightKg ? `${patient.weightKg} кг` : 'не указан'}</p>
           <p><strong>Адрес:</strong> {patient?.address || 'не указан'}</p>
         </div>
       );
@@ -449,7 +460,9 @@ export default function Cabinet() {
                     className="cabinet-inline-action"
                     type="button"
                     onClick={() => {
-                      if (window.confirm('Отменить эту запись?')) cancelAppointment(item.id);
+                      if (window.confirm('Отменить эту запись?')) {
+                        cancelAppointment(item.id);
+                      }
                     }}
                   >
                     Отменить запись
@@ -526,18 +539,20 @@ export default function Cabinet() {
       return (
         <div className="cabinet-card">
           <h2>Медкарта</h2>
-          <p className="cabinet-hint">Заполните подробную информацию о себе.</p>
+          <p className="cabinet-hint">Данные медкарты теперь хранятся на сервере и доступны во всех сессиях. </p>
           <form className="cabinet-medcard-form" onSubmit={handleMedcardSave}>
-            {[
-              ['height', 'Рост (см)', 'number'],
-              ['weight', 'Вес (кг)', 'number'],
-              ['age', 'Возраст', 'number'],
-            ].map(([name, label, type]) => (
-              <label className="cabinet-medcard-field" key={name}>
-                <span>{label}</span>
-                <input type={type} name={name} value={medcardForm[name]} onChange={handleMedcardChange} />
-              </label>
-            ))}
+            <label className="cabinet-medcard-field">
+              <span>Рост (см)</span>
+              <input type="number" name="height" value={medcardForm.height} onChange={handleMedcardChange} />
+            </label>
+            <label className="cabinet-medcard-field">
+              <span>Вес (кг)</span>
+              <input type="number" step="0.1" name="weight" value={medcardForm.weight} onChange={handleMedcardChange} />
+            </label>
+            <label className="cabinet-medcard-field">
+              <span>Возраст</span>
+              <input type="text" value={medcardAge} readOnly />
+            </label>
             <label className="cabinet-medcard-field">
               <span>Группа крови</span>
               <select name="bloodGroup" value={medcardForm.bloodGroup} onChange={handleMedcardChange}>
@@ -579,6 +594,14 @@ export default function Cabinet() {
         <div className="cabinet-card">
           <h2>Редактировать данные</h2>
           <form className="cabinet-medcard-form" onSubmit={handleEditSave}>
+            <label className="cabinet-medcard-field">
+              <span>ФИО</span>
+              <input type="text" name="fullName" value={editForm.fullName} onChange={handleEditChange} />
+            </label>
+            <label className="cabinet-medcard-field">
+              <span>Телефон</span>
+              <input type="tel" name="phone" value={editForm.phone} onChange={handleEditChange} />
+            </label>
             <label className="cabinet-medcard-field">
               <span>Электронная почта</span>
               <input type="email" name="email" value={editForm.email} onChange={handleEditChange} required />

@@ -133,12 +133,54 @@ export default function Home() {
   return (
     <div className="home">
       <section className="hero">
-        <div className="hero-content">
-          <h1>Медицинская клиника «Здоровье»</h1>
-          <p>Современное медицинское обслуживание высокого качества для пациентов любого возраста.</p>
-          <Link to="/appointments" className="btn btn-primary" style={{ marginTop: '20px', display: 'inline-block' }}>
-            Записаться на прием
-          </Link>
+        <div className="hero-layout">
+          <div className="hero-content">
+            <span className="hero-badge">Частная медицинская клиника</span>
+            <h1>Медицинская клиника «Здоровье»</h1>
+
+            <div className="hero-actions">
+              <Link to="/appointments" className="btn btn-primary hero-cta">
+                Записаться на прием
+              </Link>
+              <span className="hero-caption">Подберем удобное время приема и нужного специалиста</span>
+            </div>
+
+            <div className="hero-benefits" aria-label="Преимущества клиники">
+              <div className="hero-benefit">
+                <span className="hero-benefit__marker" aria-hidden="true" />
+                <span>Персональный подход</span>
+              </div>
+              <div className="hero-benefit">
+                <span className="hero-benefit__marker" aria-hidden="true" />
+                <span>Точная диагностика</span>
+              </div>
+              <div className="hero-benefit">
+                <span className="hero-benefit__marker" aria-hidden="true" />
+                <span>Комфорт без очередей</span>
+              </div>
+            </div>
+          </div>
+
+          <aside className="hero-panel" aria-label="Преимущества сервиса">
+            <div className="hero-panel__header">
+              <span className="hero-panel__eyebrow">Комфортный сервис</span>
+              <p>Продуманная организация приема и внимательное сопровождение пациента на каждом этапе.</p>
+            </div>
+
+            <div className="hero-metrics">
+              <div className="hero-metric">
+                <strong>15+</strong>
+                <span>лет практики у ведущих специалистов</span>
+              </div>
+              <div className="hero-metric">
+                <strong>7</strong>
+                <span>дней в неделю доступна запись</span>
+              </div>
+              <div className="hero-metric">
+                <span>На каждом этапе внимательное сопровождение пациента</span>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -237,27 +279,199 @@ export default function Home() {
 
       <style>{`
         .hero {
+          position: relative;
+          overflow: hidden;
           background:
-            radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
-            linear-gradient(135deg, #f6efff 0%, #efe5ff 48%, #e6d9ff 100%);
-          color: #352b4e;
-          padding: 72px 24px;
-          border-radius: 24px;
-          text-align: center;
+            radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 34%),
+            radial-gradient(circle at 88% 18%, rgba(120, 197, 178, 0.24), transparent 24%),
+            linear-gradient(135deg, #f7fffc 0%, #eefaf6 52%, #e3f2ee 100%);
+          color: #183a37;
+          padding: 40px;
+          border-radius: 32px;
           margin-bottom: 40px;
-          border: 1px solid rgba(155, 122, 232, 0.16);
-          box-shadow: 0 24px 60px rgba(155, 122, 232, 0.14);
+          border: 1px solid rgba(81, 142, 131, 0.18);
+          box-shadow: 0 28px 68px rgba(90, 128, 120, 0.16);
+        }
+
+        .hero::before,
+        .hero::after {
+          content: '';
+          position: absolute;
+          border-radius: 999px;
+          pointer-events: none;
+        }
+
+        .hero::before {
+          width: 260px;
+          height: 260px;
+          right: -70px;
+          top: -80px;
+          background: radial-gradient(circle, rgba(120, 197, 178, 0.26), transparent 70%);
+        }
+
+        .hero::after {
+          width: 220px;
+          height: 220px;
+          left: 48%;
+          bottom: -120px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.92), transparent 72%);
+        }
+
+        .hero-layout {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+          gap: 28px;
+          align-items: center;
+        }
+
+        .hero-content {
+          display: grid;
+          gap: 18px;
+          text-align: left;
+        }
+
+        .hero-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-self: start;
+          padding: 10px 16px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(81, 142, 131, 0.18);
+          color: #426c66;
+          font-size: 0.8rem;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
         }
 
         .hero-content h1 {
-          font-size: 2.5em;
-          margin-bottom: 10px;
+          margin: 0;
+          max-width: 720px;
+          font-size: clamp(2.5rem, 4vw, 4rem);
+          line-height: 1.02;
+          color: #143836;
         }
 
         .hero-content p {
-          font-size: 1.2em;
+          margin: 0;
+          max-width: 640px;
+          font-size: 1.08rem;
+          line-height: 1.7;
+          color: #5a736f;
+        }
+
+        .hero-actions {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 16px 18px;
+          margin-top: 8px;
+        }
+
+        .hero-cta {
+          padding: 18px 32px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #2f8176 0%, #23695f 100%);
+          box-shadow: 0 18px 36px rgba(35, 105, 95, 0.22);
+          font-size: 1.04rem;
+          font-weight: 600;
+        }
+
+        .hero-cta:hover {
+          background: linear-gradient(135deg, #367f75 0%, #215c55 100%);
+          box-shadow: 0 22px 40px rgba(35, 105, 95, 0.26);
+        }
+
+        .hero-caption {
+          color: #6e8480;
+          font-size: 0.96rem;
+        }
+
+        .hero-benefits {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          align-items: start;
+          gap: 18px;
+          margin-top: 10px;
+          padding-top: 18px;
+          border-top: 1px solid rgba(81, 142, 131, 0.16);
+        }
+
+        .hero-benefit {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: #355f59;
+          font-size: 0.96rem;
+          line-height: 1.45;
+          min-width: 0;
+        }
+
+        .hero-benefit__marker {
+          width: 10px;
+          height: 10px;
+          flex: 0 0 10px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #4f9a8d 0%, #2f8176 100%);
+          box-shadow: 0 0 0 5px rgba(79, 154, 141, 0.12);
+        }
+
+        .hero-benefit span:last-child {
+          display: block;
+        }
+
+        .hero-panel {
+          position: relative;
+          padding: 28px;
+          border-radius: 28px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(246, 253, 250, 0.94));
+          border: 1px solid rgba(81, 142, 131, 0.18);
+          box-shadow: 0 22px 44px rgba(83, 117, 112, 0.12);
+          backdrop-filter: blur(18px);
+        }
+
+        .hero-panel__header {
+          display: grid;
+          gap: 10px;
           margin-bottom: 20px;
-          color: #6b6280;
+        }
+
+        .hero-panel__eyebrow {
+          color: #2c6d64;
+          font-size: 0.82rem;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+
+        .hero-panel__header p {
+          margin: 0;
+          color: #617b76;
+          font-size: 0.98rem;
+          line-height: 1.65;
+        }
+
+        .hero-metrics {
+          display: grid;
+          gap: 14px;
+        }
+
+        .hero-metric {
+          display: grid;
+          gap: 6px;
+          padding: 16px 18px;
+          border-radius: 22px;
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(81, 142, 131, 0.14);
+        }
+
+        .hero-metric span {
+          color: #5d7571;
+          line-height: 1.5;
         }
 
         .features {
@@ -481,6 +695,44 @@ export default function Home() {
         }
 
         @media (max-width: 760px) {
+          .hero {
+            padding: 28px 22px;
+            border-radius: 28px;
+          }
+
+          .hero-layout {
+            grid-template-columns: 1fr;
+          }
+
+          .hero-content {
+            gap: 16px;
+          }
+
+          .hero-content h1 {
+            font-size: clamp(2.1rem, 10vw, 3rem);
+          }
+
+          .hero-actions {
+            align-items: stretch;
+          }
+
+          .hero-cta {
+            width: 100%;
+          }
+
+          .hero-caption {
+            max-width: 30ch;
+          }
+
+          .hero-benefits {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .hero-panel {
+            padding: 22px;
+          }
+
           .news-ribbon {
             padding-top: 10px;
           }

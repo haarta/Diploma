@@ -46,7 +46,7 @@ public class DoctorService {
     public DoctorCardResponse getPublicDoctor(Long id) {
         Doctor doctor = getDoctor(id);
         if (!doctor.isPublished()) {
-            throw new DoctorNotFoundException("Doctor not found: " + id);
+            throw new DoctorNotFoundException("Врач не найден: " + id);
         }
         return toCardResponse(doctor, false);
     }
@@ -87,7 +87,7 @@ public class DoctorService {
     public void createReview(Long doctorId, PublicReviewCreateRequest req) {
         Doctor doctor = getDoctor(doctorId);
         if (!doctor.isPublished()) {
-            throw new DoctorNotFoundException("Doctor not found: " + doctorId);
+            throw new DoctorNotFoundException("Врач не найден: " + doctorId);
         }
 
         DoctorReview review = new DoctorReview();
@@ -109,7 +109,7 @@ public class DoctorService {
     @Transactional
     public DoctorReviewItem updateReviewStatus(Long reviewId, ReviewStatus status) {
         DoctorReview review = reviewRepo.findById(reviewId)
-                .orElseThrow(() -> new ReviewNotFoundException("Review not found: " + reviewId));
+                .orElseThrow(() -> new ReviewNotFoundException("Отзыв не найден: " + reviewId));
         review.setStatus(status);
         return toReviewItem(reviewRepo.save(review));
     }
@@ -118,7 +118,7 @@ public class DoctorService {
         if (req.userId() != null) {
             var existingDoctor = doctorRepo.findByUserId(req.userId()).orElse(null);
             if (existingDoctor != null && !existingDoctor.getId().equals(doctor.getId())) {
-                throw new IllegalArgumentException("This user is already linked to another doctor profile");
+                throw new IllegalArgumentException("Этот пользователь уже привязан к другому профилю врача");
             }
         }
 
@@ -181,7 +181,7 @@ public class DoctorService {
 
     private Doctor getDoctor(Long id) {
         return doctorRepo.findById(id)
-                .orElseThrow(() -> new DoctorNotFoundException("Doctor not found: " + id));
+                .orElseThrow(() -> new DoctorNotFoundException("Врач не найден: " + id));
     }
 
     private DoctorCardResponse toCardResponse(Doctor doctor, boolean includeAllReviews) {

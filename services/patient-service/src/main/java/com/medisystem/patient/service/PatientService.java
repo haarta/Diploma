@@ -27,7 +27,7 @@ public class PatientService {
     @Transactional
     public Patient create(PatientCreateRequest req) {
         if (req.userId != null && repo.existsByUserIdAndActiveTrue(req.userId)) {
-            throw new IllegalArgumentException("Patient profile already exists for this user");
+            throw new IllegalArgumentException("Профиль пациента для этого пользователя уже существует");
         }
 
         var patient = new Patient(
@@ -43,7 +43,9 @@ public class PatientService {
                 req.bloodGroup,
                 req.rhFactor,
                 req.emergencyContactName,
-                req.emergencyContactPhone
+                req.emergencyContactPhone,
+                req.heightCm,
+                req.weightKg
         );
         return repo.save(patient);
     }
@@ -57,13 +59,13 @@ public class PatientService {
     @Transactional(readOnly = true)
     public Patient get(Long id) {
         return repo.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new PatientNotFoundException("Patient not found: " + id));
+                .orElseThrow(() -> new PatientNotFoundException("Пациент не найден: " + id));
     }
 
     @Transactional(readOnly = true)
     public Patient getByUserId(Long userId) {
         return repo.findByUserIdAndActiveTrue(userId)
-                .orElseThrow(() -> new PatientNotFoundException("Patient not found for userId: " + userId));
+                .orElseThrow(() -> new PatientNotFoundException("Пациент не найден для указанного пользователя: " + userId));
     }
 
     @Transactional(readOnly = true)
@@ -116,7 +118,7 @@ public class PatientService {
     private void applyPatch(Patient patient, PatientUpdateRequest req) {
         if (req.userId != null) {
             if (!req.userId.equals(patient.getUserId()) && repo.existsByUserIdAndActiveTrue(req.userId)) {
-                throw new IllegalArgumentException("Patient profile already exists for this user");
+            throw new IllegalArgumentException("Профиль пациента для этого пользователя уже существует");
             }
             patient.setUserId(req.userId);
         }
@@ -130,6 +132,8 @@ public class PatientService {
         if (req.chronicConditions != null) patient.setChronicConditions(req.chronicConditions);
         if (req.bloodGroup != null) patient.setBloodGroup(req.bloodGroup);
         if (req.rhFactor != null) patient.setRhFactor(req.rhFactor);
+        if (req.heightCm != null) patient.setHeightCm(req.heightCm);
+        if (req.weightKg != null) patient.setWeightKg(req.weightKg);
         if (req.emergencyContactName != null) patient.setEmergencyContactName(req.emergencyContactName);
         if (req.emergencyContactPhone != null) patient.setEmergencyContactPhone(req.emergencyContactPhone);
     }

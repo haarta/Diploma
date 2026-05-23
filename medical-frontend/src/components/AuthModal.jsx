@@ -1,19 +1,13 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { notifyAuthChanged } from '../auth';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  saveAuthTokens,
+} from '../auth';
+import { authSessionApi } from '../api';
 import '../styles/AuthModal.css';
-
-const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
-const ACCESS_TOKEN_KEY = 'auth_access_token';
-const REFRESH_TOKEN_KEY = 'auth_refresh_token';
-
-const authApi = axios.create({
-  baseURL: AUTH_API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 
 function extractErrorMessage(error) {
   const apiMessage = error.response?.data?.message || error.response?.data?.error;
@@ -42,19 +36,11 @@ export default function AuthModal() {
     password: '',
   });
 
-  const hasSession = Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
-
-  const saveTokens = (payload) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, payload.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, payload.refreshToken);
-    notifyAuthChanged();
-  };
+  const hasSession = Boolean(getAccessToken());
 
   const clearSession = () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    clearAuthTokens();
     setUser(null);
-    notifyAuthChanged();
   };
 
   const goToCabinet = (role = user?.role) => {
@@ -67,21 +53,22 @@ export default function AuthModal() {
   };
 
   const fetchMe = async (token) => {
-    const response = await authApi.get('/api/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!token) {
+      return null;
+    }
+    const response = await authSessionApi.getMe();
     return response.data;
   };
 
   const refreshSession = async () => {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    const refreshToken = getRefreshToken();
     if (!refreshToken) {
       return null;
     }
 
-    const response = await authApi.post('/api/auth/refresh', { refreshToken });
-    saveTokens(response.data);
-    return fetchMe(response.data.accessToken);
+    const response = await authSessionApi.refresh(refreshToken);
+    saveAuthTokens(response.data || {});
+    return fetchMe(response.data?.accessToken);
   };
 
   useEffect(() => {
@@ -100,7 +87,7 @@ export default function AuthModal() {
 
   useEffect(() => {
     const restoreSession = async () => {
-      const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+      const accessToken = getAccessToken();
       if (!accessToken) {
         return;
       }
@@ -129,7 +116,7 @@ export default function AuthModal() {
   };
 
   const openModal = (nextMode) => {
-    if (localStorage.getItem(ACCESS_TOKEN_KEY)) {
+    if (getAccessToken()) {
       goToCabinet();
       return;
     }
@@ -157,13 +144,15 @@ export default function AuthModal() {
     setLoading(true);
 
     try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const response = await authApi.post(endpoint, {
+      const payload = {
         email: formData.email.trim(),
         password: formData.password,
-      });
+      };
+      const response = mode === 'login'
+        ? await authSessionApi.login(payload)
+        : await authSessionApi.register(payload);
 
-      saveTokens(response.data);
+      saveAuthTokens(response.data || {});
       const me = await fetchMe(response.data.accessToken);
       setUser(me);
       setFormData({ email: '', password: '' });

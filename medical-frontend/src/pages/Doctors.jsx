@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { doctorsApi } from '../api';
 import '../styles/DoctorsCatalog.css';
 
@@ -18,7 +18,11 @@ function getAverageRating(reviews) {
 }
 
 export default function Doctors() {
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState({
+    ...INITIAL_FILTERS,
+    search: searchParams.get('search') || '',
+  });
 
   const { data: doctors = [], isLoading } = useQuery({
     queryKey: ['public-doctors'],
@@ -66,6 +70,22 @@ export default function Doctors() {
       .sort((a, b) => a[0].localeCompare(b[0], 'ru'))
       .map(([specialty, items]) => ({ specialty, items }));
   }, [filteredDoctors]);
+
+  useEffect(() => {
+    const nextSearch = searchParams.get('search') || '';
+
+    setFilters((prev) => {
+      if (prev.search === nextSearch) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        search: nextSearch,
+        specialty: 'all',
+      };
+    });
+  }, [searchParams]);
 
   if (isLoading) {
     return <div className="loading">Загрузка врачей...</div>;

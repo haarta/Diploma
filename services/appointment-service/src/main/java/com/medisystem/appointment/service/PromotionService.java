@@ -30,7 +30,7 @@ public class PromotionService {
     public PromotionCardResponse getPublicPromotion(Long id) {
         Promotion promotion = getPromotion(id);
         if (!promotion.isPublished()) {
-            throw new PromotionNotFoundException("Promotion not found: " + id);
+        throw new PromotionNotFoundException("Акция не найдена: " + id);
         }
         return toResponse(promotion);
     }
@@ -70,7 +70,7 @@ public class PromotionService {
 
     private Promotion getPromotion(Long id) {
         return promotionRepository.findById(id)
-                .orElseThrow(() -> new PromotionNotFoundException("Promotion not found: " + id));
+                .orElseThrow(() -> new PromotionNotFoundException("Акция не найдена: " + id));
     }
 
     private void validateDates(AdminPromotionUpsertRequest req) {

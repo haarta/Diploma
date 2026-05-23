@@ -33,7 +33,7 @@ public class DoctorVerificationService {
     public DoctorVerificationApplicationResponse submit(long userId, DoctorVerificationSubmitRequest req) {
         UserAccount user = findUser(userId);
         if (user.getRole() == Role.ADMIN) {
-            throw new IllegalArgumentException("Admin cannot submit doctor verification");
+            throw new IllegalArgumentException("Администратор не может подать заявку на подтверждение роли врача");
         }
 
         DoctorVerificationApplication application = applicationRepository.findByUserId(userId)
@@ -42,10 +42,10 @@ public class DoctorVerificationService {
         application.setFullName(req.fullName.trim());
         application.setSpecialty(req.specialty.trim());
         application.setLicenseNumber(trimToNull(req.licenseNumber));
-        application.setLicenseFileUrl(requireNonBlank(req.licenseFileUrl, "License file is required"));
-        application.setDiplomaFileUrl(requireNonBlank(req.diplomaFileUrl, "Diploma file is required"));
+        application.setLicenseFileUrl(requireNonBlank(req.licenseFileUrl, "Необходимо загрузить файл лицензии"));
+        application.setDiplomaFileUrl(requireNonBlank(req.diplomaFileUrl, "Необходимо загрузить файл диплома"));
         application.setSpecialtyCertificateFileUrl(
-                requireNonBlank(req.specialtyCertificateFileUrl, "Specialty certificate file is required")
+                requireNonBlank(req.specialtyCertificateFileUrl, "Необходимо загрузить файл сертификата по специальности")
         );
         application.setIdentityDocumentFileUrl(trimToNull(req.identityDocumentFileUrl));
         application.setStatus(DoctorVerificationStatus.PENDING_VERIFICATION);
@@ -58,7 +58,7 @@ public class DoctorVerificationService {
     public DoctorVerificationApplicationResponse getMine(long userId) {
         UserAccount user = findUser(userId);
         DoctorVerificationApplication application = applicationRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Doctor verification application not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Заявка на подтверждение роли врача не найдена"));
         return toResponse(application, user.getEmail());
     }
 
@@ -76,12 +76,12 @@ public class DoctorVerificationService {
     @Transactional
     public DoctorVerificationApplicationResponse review(Long id, DoctorVerificationReviewRequest req) {
         DoctorVerificationApplication application = applicationRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Doctor verification application not found: " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Заявка на подтверждение роли врача не найдена: " + id));
         UserAccount user = findUser(application.getUserId());
 
         DoctorVerificationStatus targetStatus = parseStatus(req.status);
         if (targetStatus == DoctorVerificationStatus.PENDING_VERIFICATION) {
-            throw new IllegalArgumentException("Cannot set status to PENDING_VERIFICATION during review");
+            throw new IllegalArgumentException("Во время рассмотрения нельзя установить статус «на проверке»");
         }
 
         application.setStatus(targetStatus);
@@ -97,17 +97,17 @@ public class DoctorVerificationService {
 
     private UserAccount findUser(long userId) {
         return userAccountRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + userId));
     }
 
     private DoctorVerificationStatus parseStatus(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Status is required");
+            throw new IllegalArgumentException("Необходимо указать статус");
         }
         try {
             return DoctorVerificationStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Unsupported status");
+            throw new IllegalArgumentException("Неподдерживаемый статус");
         }
     }
 

@@ -1,14 +1,31 @@
 import axios from 'axios';
-import { notifyAuthChanged } from './auth';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  saveAuthTokens,
+} from './auth';
 
-const ACCESS_TOKEN_KEY = 'auth_access_token';
-const REFRESH_TOKEN_KEY = 'auth_refresh_token';
-const APPOINTMENT_API_BASE = import.meta.env.VITE_APPOINTMENT_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8083/api';
+const APPOINTMENT_API_BASE =
+  import.meta.env.VITE_APPOINTMENT_API_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8083/api';
 const PATIENT_API_BASE = import.meta.env.VITE_PATIENT_API_URL || 'http://localhost:8082/api';
 const AUTH_API_BASE = import.meta.env.VITE_AUTH_URL || 'http://localhost:8081';
 
-const withAuth = (config = {}) => {
-  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+const createClient = (baseURL, headers = undefined) =>
+  axios.create({
+    baseURL,
+    ...(headers ? { headers } : {}),
+  });
+
+const skipRefreshHandling = (config = {}) => ({
+  ...config,
+  __skipAuthRefresh: true,
+});
+
+const withAccessToken = (config = {}) => {
+  const token = getAccessToken();
   if (!token) {
     return config;
   }
@@ -22,16 +39,12 @@ const withAuth = (config = {}) => {
   };
 };
 
-export const api = axios.create({
-  baseURL: APPOINTMENT_API_BASE,
-});
-
 let refreshPromise = null;
 
 const refreshAccessToken = async () => {
-  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refreshToken = getRefreshToken();
   if (!refreshToken) {
-    throw new Error('No refresh token');
+    throw new Error('Отсутствует токен обновления');
   }
 
   const response = await axios.post(
@@ -42,95 +55,75 @@ const refreshAccessToken = async () => {
 
   const { accessToken, refreshToken: nextRefreshToken } = response.data || {};
   if (!accessToken || !nextRefreshToken) {
-    throw new Error('Invalid refresh response');
+    throw new Error('Сервер вернул некорректный ответ при обновлении токена');
   }
 
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-  notifyAuthChanged();
+  saveAuthTokens({ accessToken, refreshToken: nextRefreshToken });
   return accessToken;
 };
 
-api.interceptors.request.use((config) => withAuth(config));
+const attachAuthInterceptors = (client) => {
+  client.interceptors.request.use((config) => withAccessToken(config));
 
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    const status = error.response?.status;
+  client.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config;
+      const status = error.response?.status;
 
-    if (!originalRequest || originalRequest._retry || ![401, 403].includes(status)) {
-      throw error;
-    }
-
-    originalRequest._retry = true;
-
-    try {
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken().finally(() => {
-          refreshPromise = null;
-        });
+      if (
+        !originalRequest ||
+        originalRequest._retry ||
+        originalRequest.__skipAuthRefresh ||
+        ![401, 403].includes(status)
+      ) {
+        throw error;
       }
 
-      const newToken = await refreshPromise;
-      originalRequest.headers = {
-        ...(originalRequest.headers || {}),
-        Authorization: `Bearer ${newToken}`,
-      };
+      originalRequest._retry = true;
 
-      return api.request(originalRequest);
-    } catch (refreshError) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      notifyAuthChanged();
-      throw refreshError;
+      try {
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => {
+            refreshPromise = null;
+          });
+        }
+
+        const newToken = await refreshPromise;
+        originalRequest.headers = {
+          ...(originalRequest.headers || {}),
+          Authorization: `Bearer ${newToken}`,
+        };
+
+        return client.request(originalRequest);
+      } catch (refreshError) {
+        clearAuthTokens();
+        throw refreshError;
+      }
     }
-  }
-);
+  );
+};
 
-export const patientApi = axios.create({
-  baseURL: PATIENT_API_BASE,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+export const api = createClient(APPOINTMENT_API_BASE);
+export const patientApi = createClient(PATIENT_API_BASE, {
+  'Content-Type': 'application/json',
+});
+export const authApi = createClient(AUTH_API_BASE, {
+  'Content-Type': 'application/json',
 });
 
-patientApi.interceptors.request.use((config) => withAuth(config));
+attachAuthInterceptors(api);
+attachAuthInterceptors(patientApi);
+attachAuthInterceptors(authApi);
 
-patientApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    const status = error.response?.status;
-
-    if (!originalRequest || originalRequest._retry || ![401, 403].includes(status)) {
-      throw error;
-    }
-
-    originalRequest._retry = true;
-
-    try {
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken().finally(() => {
-          refreshPromise = null;
-        });
-      }
-
-      const newToken = await refreshPromise;
-      originalRequest.headers = {
-        ...(originalRequest.headers || {}),
-        Authorization: `Bearer ${newToken}`,
-      };
-
-      return patientApi.request(originalRequest);
-    } catch (refreshError) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-      notifyAuthChanged();
-      throw refreshError;
-    }
-  }
-);
+export const authSessionApi = {
+  login: (data) => authApi.post('/api/auth/login', data, skipRefreshHandling()),
+  register: (data) => authApi.post('/api/auth/register', data, skipRefreshHandling()),
+  refresh: (refreshToken) =>
+    authApi.post('/api/auth/refresh', { refreshToken }, skipRefreshHandling()),
+  getMe: () => authApi.get('/api/auth/me'),
+  updateMe: (data) => authApi.patch('/api/auth/me', data),
+};
 
 export const patientsApi = {
   getMe: () => patientApi.get('/patients/me'),
@@ -167,46 +160,48 @@ export const onlineConsultationsApi = {
 };
 
 export const adminDoctorsApi = {
-  getAll: () => api.get('/admin/doctors', withAuth()),
-  getById: (id) => api.get(`/admin/doctors/${id}`, withAuth()),
-  create: (data) => api.post('/admin/doctors', data, withAuth()),
-  update: (id, data) => api.put(`/admin/doctors/${id}`, data, withAuth()),
-  delete: (id) => api.delete(`/admin/doctors/${id}`, withAuth()),
+  getAll: () => api.get('/admin/doctors'),
+  getById: (id) => api.get(`/admin/doctors/${id}`),
+  create: (data) => api.post('/admin/doctors', data),
+  update: (id, data) => api.put(`/admin/doctors/${id}`, data),
+  delete: (id) => api.delete(`/admin/doctors/${id}`),
 };
 
 export const adminPromotionsApi = {
-  getAll: () => api.get('/admin/promotions', withAuth()),
-  getById: (id) => api.get(`/admin/promotions/${id}`, withAuth()),
-  create: (data) => api.post('/admin/promotions', data, withAuth()),
-  update: (id, data) => api.put(`/admin/promotions/${id}`, data, withAuth()),
-  delete: (id) => api.delete(`/admin/promotions/${id}`, withAuth()),
+  getAll: () => api.get('/admin/promotions'),
+  getById: (id) => api.get(`/admin/promotions/${id}`),
+  create: (data) => api.post('/admin/promotions', data),
+  update: (id, data) => api.put(`/admin/promotions/${id}`, data),
+  delete: (id) => api.delete(`/admin/promotions/${id}`),
 };
 
 export const adminNewsApi = {
-  getAll: () => api.get('/admin/news', withAuth()),
-  getById: (id) => api.get(`/admin/news/${id}`, withAuth()),
-  create: (data) => api.post('/admin/news', data, withAuth()),
-  update: (id, data) => api.put(`/admin/news/${id}`, data, withAuth()),
-  delete: (id) => api.delete(`/admin/news/${id}`, withAuth()),
+  getAll: () => api.get('/admin/news'),
+  getById: (id) => api.get(`/admin/news/${id}`),
+  create: (data) => api.post('/admin/news', data),
+  update: (id, data) => api.put(`/admin/news/${id}`, data),
+  delete: (id) => api.delete(`/admin/news/${id}`),
 };
 
 export const adminOnlineConsultationsApi = {
-  getAll: () => api.get('/admin/online-consultations', withAuth()),
-  getById: (id) => api.get(`/admin/online-consultations/${id}`, withAuth()),
-  create: (data) => api.post('/admin/online-consultations', data, withAuth()),
-  update: (id, data) => api.put(`/admin/online-consultations/${id}`, data, withAuth()),
-  delete: (id) => api.delete(`/admin/online-consultations/${id}`, withAuth()),
+  getAll: () => api.get('/admin/online-consultations'),
+  getById: (id) => api.get(`/admin/online-consultations/${id}`),
+  create: (data) => api.post('/admin/online-consultations', data),
+  update: (id, data) => api.put(`/admin/online-consultations/${id}`, data),
+  delete: (id) => api.delete(`/admin/online-consultations/${id}`),
 };
 
 export const adminReviewsApi = {
-  getByStatus: (status = 'PENDING') => api.get('/admin/reviews', withAuth({ params: { status } })),
-  updateStatus: (id, status) => api.patch(`/admin/reviews/${id}/status`, { status }, withAuth()),
+  getByStatus: (status = 'PENDING') => api.get('/admin/reviews', { params: { status } }),
+  updateStatus: (id, status) => api.patch(`/admin/reviews/${id}/status`, { status }),
 };
 
 export const adminReportsApi = {
-  getDashboard: (params = {}) => api.get('/admin/reports/dashboard', withAuth({ params })),
-  exportExcel: (params = {}) => api.get('/admin/reports/export.xlsx', withAuth({ params, responseType: 'blob' })),
-  exportPdf: (params = {}) => api.get('/admin/reports/export.pdf', withAuth({ params, responseType: 'blob' })),
+  getDashboard: (params = {}) => api.get('/admin/reports/dashboard', { params }),
+  exportExcel: (params = {}) =>
+    api.get('/admin/reports/export.xlsx', { params, responseType: 'blob' }),
+  exportPdf: (params = {}) =>
+    api.get('/admin/reports/export.pdf', { params, responseType: 'blob' }),
 };
 
 export const adminFilesApi = {
@@ -214,7 +209,7 @@ export const adminFilesApi = {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
-    return api.post('/admin/files/upload', formData, withAuth());
+    return api.post('/admin/files/upload', formData);
   },
 };
 
@@ -223,42 +218,43 @@ export const filesApi = {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
-    return api.post('/files/upload', formData, withAuth());
+    return api.post('/files/upload', formData);
   },
 };
 
 export const doctorApi = {
-  getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming', withAuth()),
-  updateAppointmentStatus: (id, data) => api.patch(`/doctor/appointments/${id}/status`, data, withAuth()),
-  getDocuments: (params) => api.get('/doctor/documents', withAuth({ params })),
+  getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming'),
+  updateAppointmentStatus: (id, data) => api.patch(`/doctor/appointments/${id}/status`, data),
+  getDocuments: (params) => api.get('/doctor/documents', { params }),
   uploadDocument: (file, appointmentId, type = 'OTHER') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('appointmentId', String(appointmentId));
     formData.append('type', type);
-    return api.post('/doctor/documents/upload', formData, withAuth());
+    return api.post('/doctor/documents/upload', formData);
   },
 };
 
 export const patientDocumentsApi = {
-  getMine: () => api.get('/patient-documents/me', withAuth()),
+  getMine: () => api.get('/patient-documents/me'),
 };
 
 export const doctorVerificationApi = {
-  getMine: () => axios.get(`${AUTH_API_BASE}/api/auth/doctor-verification/me`, withAuth()),
-  submit: (data) => axios.post(`${AUTH_API_BASE}/api/auth/doctor-verification/submit`, data, withAuth()),
+  getMine: () => authApi.get('/api/auth/doctor-verification/me'),
+  submit: (data) => authApi.post('/api/auth/doctor-verification/submit', data),
   adminList: (status = 'PENDING_VERIFICATION') =>
-    axios.get(`${AUTH_API_BASE}/api/admin/doctor-verifications`, withAuth({ params: { status } })),
+    authApi.get('/api/admin/doctor-verifications', { params: { status } }),
   adminReview: (id, data) =>
-    axios.patch(`${AUTH_API_BASE}/api/admin/doctor-verifications/${id}/review`, data, withAuth()),
+    authApi.patch(`/api/admin/doctor-verifications/${id}/review`, data),
 };
 
 export const appointmentsApi = {
-  getMine: () => api.get('/appointments/me', withAuth()),
-  getBusySlots: (doctorId, date) => api.get('/public/appointments/busy', { params: { doctorId, date } }),
-  createMine: (data) => api.post('/appointments/me', data, withAuth()),
-  cancelMine: (id) => api.patch(`/appointments/me/${id}/cancel`, null, withAuth()),
-  getAll: () => api.get('/appointments', withAuth()),
+  getMine: () => api.get('/appointments/me'),
+  getBusySlots: (doctorId, dateFrom, dateTo) =>
+    api.get('/public/appointments/busy', { params: { doctorId, dateFrom, dateTo } }),
+  createMine: (data) => api.post('/appointments/me', data),
+  cancelMine: (id) => api.patch(`/appointments/me/${id}/cancel`),
+  getAll: () => api.get('/appointments'),
   getById: (id) => api.get(`/appointments/${id}`),
   create: (data) => api.post('/appointments', data),
   update: (id, data) => api.put(`/appointments/${id}`, data),
@@ -266,12 +262,12 @@ export const appointmentsApi = {
 };
 
 export const labResultsApi = {
-  getMine: () => api.get('/lab-results/me', withAuth()),
+  getMine: () => api.get('/lab-results/me'),
 };
 
 export const notificationsApi = {
-  getMine: () => api.get('/notifications/me', withAuth()),
-  getUnreadCount: () => api.get('/notifications/me/unread-count', withAuth()),
-  markAsRead: (id) => api.patch(`/notifications/me/${id}/read`, null, withAuth()),
-  markAllAsRead: () => api.post('/notifications/me/read-all', null, withAuth()),
+  getMine: () => api.get('/notifications/me'),
+  getUnreadCount: () => api.get('/notifications/me/unread-count'),
+  markAsRead: (id) => api.patch(`/notifications/me/${id}/read`),
+  markAllAsRead: () => api.post('/notifications/me/read-all'),
 };

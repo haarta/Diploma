@@ -30,7 +30,7 @@ public class OnlineConsultationService {
     public OnlineConsultationCardResponse getPublicItem(Long id) {
         OnlineConsultation item = getItem(id);
         if (!item.isPublished()) {
-            throw new OnlineConsultationNotFoundException("Online consultation not found: " + id);
+        throw new OnlineConsultationNotFoundException("Онлайн-консультация не найдена: " + id);
         }
         return toResponse(item);
     }
@@ -68,7 +68,7 @@ public class OnlineConsultationService {
 
     private OnlineConsultation getItem(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new OnlineConsultationNotFoundException("Online consultation not found: " + id));
+                .orElseThrow(() -> new OnlineConsultationNotFoundException("Онлайн-консультация не найдена: " + id));
     }
 
     private void applyFields(OnlineConsultation item, AdminOnlineConsultationUpsertRequest req) {

@@ -19,7 +19,7 @@ public class LabResultService {
         this.labResultRepository = labResultRepository;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<LabResultResponse> getMine(long userId) {
         List<LabResult> results = labResultRepository.findAllByUserIdOrderByOrderedAtDesc(userId);
         if (results.isEmpty()) {
@@ -38,7 +38,6 @@ public class LabResultService {
                 .toList();
     }
 
-    @Transactional
     protected List<LabResult> seedDemoResults(long userId) {
         LocalDateTime now = LocalDateTime.now();
         LabResult cbc = create(userId, "Общий анализ крови", "Общеклинические исследования", now.minusDays(12), now.minusDays(10), LabResultStatus.READY, "/mock-lab-results/cbc-result.pdf");
