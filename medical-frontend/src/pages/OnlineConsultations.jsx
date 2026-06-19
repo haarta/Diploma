@@ -2,28 +2,44 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { onlineConsultationsApi } from '../api';
 
-function OnlineConsultationCard({ item }) {
-  const className = `online-consultation-card${item.imageUrl ? '' : ' online-consultation-card--no-image'}`;
-  const style = item.imageUrl
-    ? { '--online-consultation-image': `url("${item.imageUrl}")` }
-    : undefined;
+function OnlineConsultationAction({ item }) {
+  const label = item.buttonText || 'Записаться на прием';
+
+  if (item.buttonLink) {
+    return (
+      <a className="btn btn--online-consultation" href={item.buttonLink} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    );
+  }
 
   return (
-    <article className={className} style={style}>
-      <span className="online-consultation-card__eyebrow">Онлайн-консультация</span>
-      <h2>{item.title}</h2>
-      <p className="online-consultation-card__summary">{item.shortDescription}</p>
-      {item.description ? <p className="online-consultation-card__description">{item.description}</p> : null}
-      <div className="online-consultation-card__actions">
-        {item.buttonLink ? (
-          <a className="btn btn-success" href={item.buttonLink} target="_blank" rel="noreferrer">
-            {item.buttonText || 'Записаться на прием'}
-          </a>
-        ) : (
-          <Link className="btn btn-success" to="/appointments">
-            {item.buttonText || 'Записаться на прием'}
-          </Link>
-        )}
+    <Link className="btn btn--online-consultation" to="/appointments">
+      {label}
+    </Link>
+  );
+}
+
+function OnlineConsultationCard({ item }) {
+  const className = `online-consultation-card${item.imageUrl ? '' : ' online-consultation-card--no-image'}`;
+
+  return (
+    <article className={className}>
+      {item.imageUrl ? (
+        <div className="online-consultation-card__media" aria-hidden="true">
+          <img src={item.imageUrl} alt="" loading="lazy" />
+        </div>
+      ) : null}
+      <div className="online-consultation-card__overlay" aria-hidden="true" />
+
+      <div className="online-consultation-card__body">
+        <span className="online-consultation-card__eyebrow">Онлайн-консультация</span>
+        <h2>{item.title}</h2>
+        <p className="online-consultation-card__summary">{item.shortDescription}</p>
+        {item.description ? <p className="online-consultation-card__description">{item.description}</p> : null}
+        <div className="online-consultation-card__actions">
+          <OnlineConsultationAction item={item} />
+        </div>
       </div>
     </article>
   );
@@ -44,7 +60,10 @@ export default function OnlineConsultations() {
         <div>
           <span className="online-consultations-hero__badge">Дистанционный формат</span>
           <h1>Онлайн-консультации</h1>
-          <p>Получите рекомендации специалиста, не выходя из дома. Содержимое этого раздела настраивается из админ-панели.</p>
+          <p>
+            Получите рекомендации специалиста без визита в клинику. Содержимое этого
+            раздела настраивается из административной панели.
+          </p>
         </div>
       </section>
 
@@ -67,13 +86,13 @@ export default function OnlineConsultations() {
             <h2>Как это работает</h2>
             <div className="online-consultation-steps__grid">
               <article className="online-consultation-step" data-step="1">
-                <p>Выберите необходимую консультацию, заполните форму и оплатите.</p>
+                <p>Выберите консультацию, заполните форму и завершите оформление заявки.</p>
               </article>
               <article className="online-consultation-step" data-step="2">
-                <p>Дождитесь звонка оператора Call-центра и подтвердите запись на консультацию.</p>
+                <p>Дождитесь звонка оператора call-центра и подтвердите удобное время консультации.</p>
               </article>
               <article className="online-consultation-step" data-step="3">
-                <p>В назначенное время с Вами свяжется специалист по видео или аудио звонку.</p>
+                <p>В назначенное время специалист свяжется с вами по видео- или аудиосвязи.</p>
               </article>
             </div>
           </section>

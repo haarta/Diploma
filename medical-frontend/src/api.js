@@ -223,6 +223,7 @@ export const filesApi = {
 };
 
 export const doctorApi = {
+  getMe: () => api.get('/doctor/me'),
   getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming'),
   updateAppointmentStatus: (id, data) => api.patch(`/doctor/appointments/${id}/status`, data),
   getDocuments: (params) => api.get('/doctor/documents', { params }),

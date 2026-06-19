@@ -3,54 +3,30 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { newsApi, promotionsApi } from '../api';
 import ExpandableNewsCard from '../components/ExpandableNewsCard';
+import PromotionDetailsModal from '../components/PromotionDetailsModal';
+import { formatPromotionPeriod } from '../utils/promotions';
 
-const promotionDateFormatter = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'long',
-});
-
-const formatDate = (value) => {
-  if (!value) {
-    return '';
-  }
-
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return promotionDateFormatter.format(date);
-};
-
-const formatPromotionPeriod = (promotion) => {
-  if (promotion.activeFrom && promotion.activeTo) {
-    return `С ${formatDate(promotion.activeFrom)} по ${formatDate(promotion.activeTo)}`;
-  }
-  if (promotion.activeFrom) {
-    return `С ${formatDate(promotion.activeFrom)}`;
-  }
-  if (promotion.activeTo) {
-    return `До ${formatDate(promotion.activeTo)}`;
-  }
-  return '';
-};
-
-function PromotionPreviewCard({ promotion }) {
+function PromotionPreviewCard({ promotion, onOpen }) {
   const period = formatPromotionPeriod(promotion);
 
   return (
-    <article className="promotion-preview-card">
-      {promotion.imageUrl ? (
-        <img className="promotion-preview-card__image" src={promotion.imageUrl} alt={promotion.title} />
-      ) : (
-        <div className="promotion-preview-card__image promotion-preview-card__image--placeholder">АКЦИЯ</div>
-      )}
+    <button type="button" className="promotion-preview-card" onClick={() => onOpen(promotion)}>
+      <div className="promotion-preview-card__media">
+        {promotion.imageUrl ? (
+          <img className="promotion-preview-card__image" src={promotion.imageUrl} alt={promotion.title} />
+        ) : (
+          <div className="promotion-preview-card__image promotion-preview-card__image--placeholder">АКЦИЯ</div>
+        )}
+      </div>
       <div className="promotion-preview-card__content">
         <h3>{promotion.title}</h3>
         <p>{promotion.shortDescription}</p>
-        {period ? <span className="promotion-period">{period}</span> : null}
+        <div className="promotion-preview-card__footer">
+          {period ? <span className="promotion-period">{period}</span> : <span />}
+          <span className="promotion-preview-card__link">Открыть акцию</span>
+        </div>
       </div>
-    </article>
+    </button>
   );
 }
 
@@ -58,6 +34,7 @@ export default function Home() {
   const newsViewportRef = useRef(null);
   const [visibleNewsCount, setVisibleNewsCount] = useState(1);
   const [newsStartIndex, setNewsStartIndex] = useState(0);
+  const [selectedPromotion, setSelectedPromotion] = useState(null);
 
   const { data: newsItems = [], isLoading: newsLoading } = useQuery({
     queryKey: ['public-news'],
@@ -266,7 +243,7 @@ export default function Home() {
         {promotions.length ? (
           <div className="promotion-preview-grid">
             {promotions.slice(0, 3).map((promotion) => (
-              <PromotionPreviewCard key={promotion.id} promotion={promotion} />
+              <PromotionPreviewCard key={promotion.id} promotion={promotion} onOpen={setSelectedPromotion} />
             ))}
           </div>
         ) : (
@@ -276,6 +253,8 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      <PromotionDetailsModal promotion={selectedPromotion} onClose={() => setSelectedPromotion(null)} />
 
       <style>{`
         .hero {
@@ -647,21 +626,42 @@ export default function Home() {
 
         .promotion-preview-card {
           display: grid;
-          grid-template-columns: 120px 1fr;
-          gap: 16px;
+          grid-template-rows: minmax(200px, 240px) 1fr;
+          gap: 0;
           background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(243, 247, 255, 0.96));
           border-radius: 22px;
           border: 1px solid rgba(125, 151, 196, 0.18);
           overflow: hidden;
           box-shadow: 0 18px 40px rgba(110, 130, 170, 0.12);
+          padding: 0;
+          text-align: left;
+          cursor: pointer;
+          appearance: none;
+          font: inherit;
+          color: inherit;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .promotion-preview-card:hover {
+          transform: translateY(-3px);
+          border-color: rgba(125, 151, 196, 0.3);
+          box-shadow: 0 22px 46px rgba(110, 130, 170, 0.16);
+        }
+
+        .promotion-preview-card__media {
+          background: linear-gradient(180deg, #f7fbff, #edf3f9);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
         }
 
         .promotion-preview-card__image {
           width: 100%;
           height: 100%;
-          min-height: 160px;
-          object-fit: cover;
-          background: linear-gradient(135deg, #12bff6, #dff5ff);
+          min-height: 0;
+          object-fit: contain;
+          background: transparent;
           color: white;
           display: flex;
           align-items: center;
@@ -670,18 +670,39 @@ export default function Home() {
           letter-spacing: 0.08em;
         }
 
+        .promotion-preview-card__image--placeholder {
+          background: linear-gradient(135deg, #12bff6, #dff5ff);
+        }
+
         .promotion-preview-card__content {
-          padding: 18px 18px 18px 0;
+          display: grid;
+          gap: 14px;
+          padding: 20px;
         }
 
         .promotion-preview-card__content h3 {
-          margin-bottom: 10px;
+          margin: 0;
           color: #50627f;
         }
 
         .promotion-preview-card__content p {
-          margin-bottom: 14px;
+          margin: 0;
           color: #65748b;
+          line-height: 1.6;
+        }
+
+        .promotion-preview-card__footer {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .promotion-preview-card__link {
+          color: #1880a7;
+          font-weight: 700;
+          font-size: 0.92rem;
         }
 
         .promotion-period {
@@ -752,11 +773,11 @@ export default function Home() {
           }
 
           .promotion-preview-card {
-            grid-template-columns: 1fr;
+            grid-template-rows: minmax(180px, 220px) 1fr;
           }
 
           .promotion-preview-card__content {
-            padding: 0 18px 18px;
+            padding: 18px;
           }
         }
       `}</style>

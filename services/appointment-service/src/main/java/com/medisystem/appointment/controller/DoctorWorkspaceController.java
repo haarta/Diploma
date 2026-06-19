@@ -2,6 +2,7 @@ package com.medisystem.appointment.controller;
 
 import com.medisystem.appointment.dto.doctor.DoctorAppointmentStatusUpdateRequest;
 import com.medisystem.appointment.dto.doctor.DoctorMedicalDocumentResponse;
+import com.medisystem.appointment.dto.doctor.DoctorProfileResponse;
 import com.medisystem.appointment.dto.doctor.DoctorUpcomingAppointmentResponse;
 import com.medisystem.appointment.dto.doctor.PatientDocumentResponse;
 import com.medisystem.appointment.security.UserPrincipal;
@@ -28,6 +29,13 @@ public class DoctorWorkspaceController {
 
     public DoctorWorkspaceController(DoctorWorkspaceService doctorWorkspaceService) {
         this.doctorWorkspaceService = doctorWorkspaceService;
+    }
+
+    @GetMapping("/me")
+    public DoctorProfileResponse getProfile(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return doctorWorkspaceService.getProfile(principal.getUserId());
     }
 
     @GetMapping("/appointments/upcoming")

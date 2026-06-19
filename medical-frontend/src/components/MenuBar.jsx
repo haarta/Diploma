@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 
 const getMenuItemClassName = ({ isActive }) => `menu-item${isActive ? ' menu-item-primary' : ''}`;
 
@@ -21,9 +21,9 @@ export default function MenuBar() {
         <NavLink to="/online-consultations" className={getMenuItemClassName}>
           Онлайн-консультация
         </NavLink>
-        <Link to="/" className="menu-item">
+        <NavLink to="/contacts" className={getMenuItemClassName}>
           Контакты
-        </Link>
+        </NavLink>
       </div>
     </nav>
   );

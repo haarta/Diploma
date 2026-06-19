@@ -14,6 +14,7 @@ import DoctorVerificationRequest from './pages/DoctorVerificationRequest';
 import OnlineConsultations from './pages/OnlineConsultations';
 import News from './pages/News';
 import Promotions from './pages/Promotions';
+import Contacts from './pages/Contacts';
 import AdminPanel from './pages/AdminPanel';
 import { getAccessToken, isAdmin, isDoctor } from './auth';
 import './App.css';
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/online-consultations" element={<OnlineConsultations />} />
               <Route path="/news" element={<News />} />
               <Route path="/promotions" element={<Promotions />} />
+              <Route path="/contacts" element={<Contacts />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route
                 path="/admin/*"

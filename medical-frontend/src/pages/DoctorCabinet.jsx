@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { doctorApi } from '../api';
+import { authSessionApi, doctorApi } from '../api';
 import '../styles/DoctorCabinet.css';
 
 const DOC_TYPES = [
@@ -11,18 +11,65 @@ const DOC_TYPES = [
 
 const STATUS_OPTIONS = [
   { value: 'CONFIRMED', label: 'Подтвердить' },
-  { value: 'COMPLETED', label: 'Завершить приём' },
+  { value: 'COMPLETED', label: 'Завершить прием' },
   { value: 'NO_SHOW', label: 'Отметить неявку' },
 ];
 
+const ROLE_LABELS = {
+  DOCTOR: 'Врач',
+  ADMIN: 'Администратор',
+  PATIENT: 'Пациент',
+};
+
+const APPOINTMENT_STATUS_LABELS = {
+  SCHEDULED: 'Запланирован',
+  CONFIRMED: 'Подтвержден',
+  COMPLETED: 'Завершен',
+  CANCELLED: 'Отменен',
+  NO_SHOW: 'Неявка',
+};
+
 function formatTime(value) {
   return value ? String(value).slice(0, 5) : '—';
+}
+
+function formatExperience(years) {
+  if (!years && years !== 0) {
+    return '—';
+  }
+  return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
+}
+
+function formatRating(value) {
+  return Number.isFinite(value) ? value.toFixed(1) : '—';
+}
+
+function formatRole(value) {
+  return ROLE_LABELS[value] || 'Врач';
+}
+
+function formatAppointmentStatus(value) {
+  return APPOINTMENT_STATUS_LABELS[value] || value || '—';
+}
+
+function getInitials(value) {
+  if (!value) {
+    return 'В';
+  }
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item[0]?.toUpperCase() || '')
+    .join('');
 }
 
 export default function DoctorCabinet() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [profile, setProfile] = useState(null);
+  const [account, setAccount] = useState(null);
   const [upcoming, setUpcoming] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
@@ -34,17 +81,31 @@ export default function DoctorCabinet() {
   const loadData = async () => {
     setLoading(true);
     setError('');
+
     try {
-      const [appointmentsResponse, documentsResponse] = await Promise.all([
+      const [doctorResponse, accountResponse, appointmentsResponse, documentsResponse] = await Promise.all([
+        doctorApi.getMe(),
+        authSessionApi.getMe(),
         doctorApi.getUpcomingAppointments(),
         doctorApi.getDocuments(),
       ]);
+
       const appointments = appointmentsResponse.data || [];
+      setProfile(doctorResponse.data || null);
+      setAccount(accountResponse.data || null);
       setUpcoming(appointments);
       setDocuments(documentsResponse.data || []);
-      if (!selectedAppointmentId && appointments.length > 0) {
-        setSelectedAppointmentId(String(appointments[0].id));
-      }
+
+      setSelectedAppointmentId((current) => {
+        if (appointments.length === 0) {
+          return '';
+        }
+        if (current && appointments.some((item) => String(item.id) === current)) {
+          return current;
+        }
+        return String(appointments[0].id);
+      });
+
       setStatusForms((prev) => {
         const next = { ...prev };
         appointments.forEach((item) => {
@@ -77,11 +138,14 @@ export default function DoctorCabinet() {
     event.preventDefault();
     setMessage('');
     setError('');
+
     if (!selectedAppointmentId || !file) {
-      setError('Выберите приём и файл.');
+      setError('Выберите прием и файл.');
       return;
     }
+
     setUploading(true);
+
     try {
       await doctorApi.uploadDocument(file, selectedAppointmentId, docType);
       setFile(null);
@@ -105,46 +169,107 @@ export default function DoctorCabinet() {
   };
 
   const handleStatusUpdate = async (appointmentId) => {
-    const payload = statusForms[appointmentId];
+    setMessage('');
+    setError('');
+
     try {
-      await doctorApi.updateAppointmentStatus(appointmentId, payload);
-      setMessage('Статус приёма обновлён.');
+      await doctorApi.updateAppointmentStatus(appointmentId, statusForms[appointmentId]);
+      setMessage('Статус приема обновлен.');
       await loadData();
     } catch (requestError) {
-      setError(requestError?.response?.data?.error || 'Не удалось обновить статус приёма.');
+      setError(requestError?.response?.data?.error || 'Не удалось обновить статус приема.');
     }
   };
 
   return (
     <section className="doctor-cabinet-page">
       <header className="doctor-cabinet-head">
-        <h1>Кабинет врача</h1>
+        <div>
+          <h1>Кабинет врача</h1>
+          <p className="doctor-cabinet-head__subtitle">Рабочее место врача для приема пациентов и загрузки документов</p>
+        </div>
         <button className="doctor-refresh-btn" type="button" onClick={loadData} disabled={loading}>
           Обновить
         </button>
       </header>
+
+      {profile ? (
+        <section className="doctor-profile-card">
+          <div className="doctor-profile-card__identity">
+            {profile.photoUrl ? (
+              <img className="doctor-profile-card__avatar" src={profile.photoUrl} alt={profile.fullName} />
+            ) : (
+              <div className="doctor-profile-card__avatar doctor-profile-card__avatar--placeholder">
+                {getInitials(profile.fullName)}
+              </div>
+            )}
+
+            <div className="doctor-profile-card__meta">
+              <span className="doctor-profile-card__badge">Профиль врача</span>
+              <h2>{profile.fullName}</h2>
+              <p className="doctor-profile-card__specialty">{profile.specialty || 'Специальность не указана'}</p>
+              {profile.description ? <p className="doctor-profile-card__description">{profile.description}</p> : null}
+            </div>
+          </div>
+
+          <div className="doctor-profile-card__facts">
+            <div>
+              <span>Учетная запись</span>
+              <strong>{account?.email || '—'}</strong>
+            </div>
+            <div>
+              <span>Роль</span>
+              <strong>{formatRole(account?.role)}</strong>
+            </div>
+            <div>
+              <span>Специальность</span>
+              <strong>{profile.specialty || '—'}</strong>
+            </div>
+            <div>
+              <span>Филиал</span>
+              <strong>{profile.branch || '—'}</strong>
+            </div>
+            <div>
+              <span>Стаж</span>
+              <strong>{formatExperience(profile.experienceYears)}</strong>
+            </div>
+            <div>
+              <span>Рейтинг</span>
+              <strong>{formatRating(profile.averageRating)}</strong>
+            </div>
+            <div>
+              <span>Отзывы</span>
+              <strong>{profile.reviewCount ?? 0}</strong>
+            </div>
+            <div>
+              <span>ID врача</span>
+              <strong>{profile.id || '—'}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {error ? <p className="doctor-error">{error}</p> : null}
       {message ? <p className="doctor-success">{message}</p> : null}
 
       <div className="doctor-cabinet-grid">
         <section className="doctor-card">
-          <h2>Приёмы</h2>
+          <h2>Приемы</h2>
           {loading ? (
             <p>Загрузка...</p>
           ) : upcoming.length === 0 ? (
-            <p>У вас нет активных приёмов.</p>
+            <p>У вас нет активных приемов.</p>
           ) : (
             <div className="doctor-list">
               {upcoming.map((item) => (
                 <article className="doctor-list-item" key={item.id}>
-                  <h3>{item.patientFullName || `Приём #${item.id}`}</h3>
+                  <h3>{item.patientFullName || `Прием #${item.id}`}</h3>
                   <p><strong>Услуга:</strong> {item.serviceName || 'Консультация'}</p>
                   <p><strong>Дата:</strong> {item.appointmentDate}</p>
                   <p><strong>Время:</strong> {formatTime(item.appointmentTime)}</p>
-                  <p><strong>Email:</strong> {item.patientEmail || '—'}</p>
-                  <p><strong>Статус:</strong> {item.status}</p>
-                  {item.completionSummary ? <p><strong>Комментарий:</strong> {item.completionSummary}</p> : null}
+                  <p><strong>Эл. почта пациента:</strong> {item.patientEmail || '—'}</p>
+                  <p><strong>Статус:</strong> {formatAppointmentStatus(item.status)}</p>
+                  {item.completionSummary ? <p><strong>Комментарий врача:</strong> {item.completionSummary}</p> : null}
 
                   <div className="doctor-upload-form">
                     <label>
@@ -170,8 +295,6 @@ export default function DoctorCabinet() {
                       Сохранить статус
                     </button>
                   </div>
-
-                  <p><strong>Документов:</strong> {documentsByAppointment.get(String(item.id))?.length || 0}</p>
                 </article>
               ))}
             </div>
@@ -182,9 +305,9 @@ export default function DoctorCabinet() {
           <h2>Загрузить заключение или документ</h2>
           <form className="doctor-upload-form" onSubmit={handleUpload}>
             <label>
-              Приём
+              Прием
               <select value={selectedAppointmentId} onChange={(event) => setSelectedAppointmentId(event.target.value)}>
-                <option value="">Выберите приём</option>
+                <option value="">Выберите прием</option>
                 {upcoming.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.patientFullName || `#${item.id}`} • {item.appointmentDate} {formatTime(item.appointmentTime)}
@@ -218,7 +341,7 @@ export default function DoctorCabinet() {
 
           <h3>Последние документы</h3>
           {documents.length === 0 ? (
-            <p>Документы ещё не загружены.</p>
+            <p>Документы еще не загружены.</p>
           ) : (
             <ul className="doctor-doc-list">
               {documents.slice(0, 12).map((item) => (

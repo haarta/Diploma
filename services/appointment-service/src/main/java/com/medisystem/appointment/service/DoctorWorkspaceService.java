@@ -3,12 +3,14 @@ package com.medisystem.appointment.service;
 import com.medisystem.appointment.dto.admin.FileUploadResponse;
 import com.medisystem.appointment.dto.doctor.DoctorAppointmentStatusUpdateRequest;
 import com.medisystem.appointment.dto.doctor.DoctorMedicalDocumentResponse;
+import com.medisystem.appointment.dto.doctor.DoctorProfileResponse;
 import com.medisystem.appointment.dto.doctor.DoctorUpcomingAppointmentResponse;
 import com.medisystem.appointment.dto.doctor.PatientDocumentResponse;
 import com.medisystem.appointment.entity.Appointment;
 import com.medisystem.appointment.entity.AppointmentStatus;
 import com.medisystem.appointment.entity.Doctor;
 import com.medisystem.appointment.entity.DoctorMedicalDocument;
+import com.medisystem.appointment.entity.ReviewStatus;
 import com.medisystem.appointment.repo.AppointmentRepository;
 import com.medisystem.appointment.repo.DoctorMedicalDocumentRepository;
 import com.medisystem.appointment.repo.DoctorRepository;
@@ -50,6 +52,12 @@ public class DoctorWorkspaceService {
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
         this.userNotificationService = userNotificationService;
+    }
+
+    @Transactional(readOnly = true)
+    public DoctorProfileResponse getProfile(long userId) {
+        Doctor doctor = findDoctorByUserId(userId);
+        return toProfileResponse(doctor);
     }
 
     @Transactional(readOnly = true)
@@ -223,6 +231,33 @@ public class DoctorWorkspaceService {
                 appointment.getNotes(),
                 appointment.getServiceName(),
                 appointment.getCompletionSummary()
+        );
+    }
+
+    private DoctorProfileResponse toProfileResponse(Doctor doctor) {
+        var approvedReviews = doctor.getReviews().stream()
+                .filter(item -> item.getStatus() == ReviewStatus.APPROVED)
+                .toList();
+
+        Double averageRating = approvedReviews.isEmpty()
+                ? null
+                : approvedReviews.stream()
+                .mapToInt(item -> item.getRating() == null ? 0 : item.getRating())
+                .average()
+                .orElse(0.0d);
+
+        return new DoctorProfileResponse(
+                doctor.getId(),
+                doctor.getUserId(),
+                doctor.getFullName(),
+                doctor.getSpecialty(),
+                doctor.getExperienceYears(),
+                doctor.getPhotoUrl(),
+                doctor.getDescription(),
+                doctor.getBranch(),
+                doctor.isPublished(),
+                approvedReviews.size(),
+                averageRating
         );
     }
 

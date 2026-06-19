@@ -36,6 +36,8 @@ const formatCount = (value) => new Intl.NumberFormat('ru-RU').format(value || 0)
 const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 const formatDate = (value) =>
   new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(new Date(value));
+const formatFullDate = (value) =>
+  new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(value));
 const formatMoney = (value) =>
   new Intl.NumberFormat('ru-RU', {
     style: 'currency',
@@ -78,11 +80,6 @@ export default function AdminAnalytics() {
     },
   });
 
-  const dayMax = useMemo(() => {
-    const values = data?.appointmentsByDay || [];
-    return Math.max(...values.map((item) => item.totalAppointments), 1);
-  }, [data]);
-
   const doctors = data?.doctorLoad || [];
   const specialties = [...new Set(doctors.map((item) => item.specialty).filter(Boolean))];
 
@@ -122,10 +119,33 @@ export default function AdminAnalytics() {
   const specialtyBreakdown = data?.specialtyBreakdown || [];
   const doctorLoad = data?.doctorLoad || [];
   const topServices = data?.topServices || [];
+  const statusCounts = Object.fromEntries(
+    appointmentsByStatus.map((item) => [item.status, Number(item.count || 0)])
+  );
+  const completedOnlyCount = Number(statusCounts.COMPLETED || 0);
+  const disruptionCount = Number(statusCounts.CANCELLED || 0) + Number(statusCounts.NO_SHOW || 0);
+  const topDoctorLoad = doctorLoad.slice(0, 6);
+  const doctorLoadMax = Math.max(...topDoctorLoad.map((item) => item.totalAppointments), 1);
   const averageCheck =
-    summary.totalAppointments && Number(summary.totalAppointments) > 0
-      ? Number(summary.totalRevenue || 0) / Number(summary.totalAppointments)
+    completedOnlyCount > 0
+      ? Number(summary.totalRevenue || 0) / completedOnlyCount
       : 0;
+  const averageDoctorLoad =
+    summary.activeDoctors && Number(summary.activeDoctors) > 0
+      ? Number(summary.totalAppointments || 0) / Number(summary.activeDoctors)
+      : 0;
+  const completionRate =
+    summary.totalAppointments && Number(summary.totalAppointments) > 0
+      ? (completedOnlyCount / Number(summary.totalAppointments)) * 100
+      : 0;
+  const disruptionRate =
+    summary.totalAppointments && Number(summary.totalAppointments) > 0
+      ? (disruptionCount / Number(summary.totalAppointments)) * 100
+      : 0;
+  const busiestDay = appointmentsByDay.reduce(
+    (current, item) => (item.totalAppointments > (current?.totalAppointments || 0) ? item : current),
+    null
+  );
 
   return (
     <div className="admin-analytics">
@@ -228,8 +248,8 @@ export default function AdminAnalytics() {
               <strong>{formatCount(summary.uniquePatients)}</strong>
             </div>
             <div>
-              <span>Доля отмен</span>
-              <strong>{formatPercent(summary.cancellationRate)}</strong>
+              <span>Срывы записи</span>
+              <strong>{formatPercent(disruptionRate)}</strong>
             </div>
           </div>
         </article>
@@ -239,27 +259,75 @@ export default function AdminAnalytics() {
         <article className="admin-analytics-panel admin-analytics-panel--wide">
           <div className="admin-analytics-heading">
             <div>
-              <p className="admin-panel-eyebrow">Динамика</p>
-              <h3>Записи по дням</h3>
+              <p className="admin-panel-eyebrow">Загрузка</p>
+              <h3>Нагрузка по врачам</h3>
             </div>
             <div className="admin-analytics-heading-meta">
-              <span>Пациенты: {formatCount(summary.uniquePatients)}</span>
-              <span>Врачи: {formatCount(summary.activeDoctors)}</span>
-              <span>Отмены: {formatPercent(summary.cancellationRate)}</span>
+              <span>Средняя нагрузка: {averageDoctorLoad.toFixed(1)} записи на врача</span>
+              <span>Завершение: {formatPercent(completionRate)}</span>
+              <span>Потери: {formatPercent(disruptionRate)}</span>
             </div>
           </div>
-          <div className="admin-analytics-chart">
-            {appointmentsByDay.map((item) => (
-              <div key={item.date} className="admin-analytics-bar">
-                <div
-                  className="admin-analytics-bar__fill"
-                  style={{ height: `${Math.max((item.totalAppointments / dayMax) * 100, item.totalAppointments ? 12 : 0)}%` }}
-                  title={`${formatDate(item.date)}: ${item.totalAppointments}`}
-                />
-                <span>{formatDate(item.date)}</span>
+          {topDoctorLoad.length === 0 ? (
+            <p>Нет данных по врачам за выбранный период.</p>
+          ) : (
+            <>
+              <div className="admin-analytics-workload">
+                {topDoctorLoad.map((item) => {
+                  const total = Math.max(Number(item.totalAppointments || 0), 1);
+                  const activePercent = (Number(item.scheduledAppointments || 0) / total) * 100;
+                  const completedPercent = (Number(item.completedAppointments || 0) / total) * 100;
+                  const cancelledPercent = Math.max(0, 100 - activePercent - completedPercent);
+                  const trackWidth = Math.max((Number(item.totalAppointments || 0) / doctorLoadMax) * 100, 16);
+
+                  return (
+                    <div key={item.doctorId} className="admin-analytics-workload-row">
+                      <div className="admin-analytics-workload-info">
+                        <strong>{item.doctorName}</strong>
+                        <span>{item.specialty}</span>
+                      </div>
+                      <div className="admin-analytics-workload-track">
+                        <div
+                          className="admin-analytics-workload-track__inner"
+                          style={{ width: `${trackWidth}%` }}
+                          title={`${item.doctorName}: ${formatCount(item.totalAppointments)} записей`}
+                        >
+                          <span
+                            className="admin-analytics-workload-segment admin-analytics-workload-segment--active"
+                            style={{ width: `${activePercent}%` }}
+                          />
+                          <span
+                            className="admin-analytics-workload-segment admin-analytics-workload-segment--completed"
+                            style={{ width: `${completedPercent}%` }}
+                          />
+                          <span
+                            className="admin-analytics-workload-segment admin-analytics-workload-segment--cancelled"
+                            style={{ width: `${cancelledPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="admin-analytics-workload-metric">
+                        <strong>{formatCount(item.totalAppointments)}</strong>
+                        <span>{formatPercent(item.sharePercent)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+
+              <div className="admin-analytics-legend">
+                <span><i className="admin-analytics-workload-segment admin-analytics-workload-segment--active" />Активные</span>
+                <span><i className="admin-analytics-workload-segment admin-analytics-workload-segment--completed" />Завершённые</span>
+                <span><i className="admin-analytics-workload-segment admin-analytics-workload-segment--cancelled" />Отменённые и неявки</span>
+              </div>
+
+              {doctorLoad.length > topDoctorLoad.length ? (
+                <p className="admin-analytics-hint">
+                  В графике показаны самые загруженные врачи. Полная детализация остаётся в таблице ниже.
+                </p>
+              ) : null}
+            </>
+          )}
         </article>
 
         <article className="admin-analytics-panel">
@@ -319,8 +387,12 @@ export default function AdminAnalytics() {
               <strong>{formatDate(data.fromDate)} - {formatDate(data.toDate)}</strong>
             </div>
             <div>
-              <span>Уникальные пациенты</span>
-              <strong>{formatCount(summary.uniquePatients)}</strong>
+              <span>Пиковый день</span>
+              <strong>
+                {busiestDay && busiestDay.totalAppointments > 0
+                  ? `${formatFullDate(busiestDay.date)} (${formatCount(busiestDay.totalAppointments)})`
+                  : 'Нет данных'}
+              </strong>
             </div>
             <div>
               <span>Активные врачи</span>
@@ -338,7 +410,7 @@ export default function AdminAnalytics() {
         <div className="admin-analytics-heading">
           <div>
             <p className="admin-panel-eyebrow">Загрузка</p>
-            <h3>Врачи по количеству записей</h3>
+            <h3>Детализация по врачам</h3>
           </div>
         </div>
         {doctorLoad.length === 0 ? (
