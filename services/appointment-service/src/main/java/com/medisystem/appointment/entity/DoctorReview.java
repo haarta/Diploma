@@ -36,6 +36,12 @@ public class DoctorReview {
     @Column(columnDefinition = "text", nullable = false)
     private String text;
 
+    @Column(name = "appointment_id")
+    private Long appointmentId;
+
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReviewStatus status = ReviewStatus.PENDING;
@@ -64,6 +70,14 @@ public class DoctorReview {
         return text;
     }
 
+    public Long getAppointmentId() {
+        return appointmentId;
+    }
+
+    public Long getCreatedByUserId() {
+        return createdByUserId;
+    }
+
     public ReviewStatus getStatus() {
         return status;
     }
@@ -86,6 +100,14 @@ public class DoctorReview {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public void setAppointmentId(Long appointmentId) {
+        this.appointmentId = appointmentId;
+    }
+
+    public void setCreatedByUserId(Long createdByUserId) {
+        this.createdByUserId = createdByUserId;
     }
 
     public void setStatus(ReviewStatus status) {

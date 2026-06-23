@@ -31,3 +31,6 @@ management:
 auth:
   jwt:
     secret: ${AUTH_JWT_SECRET:change_me_to_a_real_secret_change_me}
+
+internal:
+  service-token: ${INTERNAL_SERVICE_TOKEN:change_me_internal_service_token}

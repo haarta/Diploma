@@ -155,6 +155,34 @@
   padding: 18px;
 }
 
+.doctor-card__hint {
+  margin: 8px 0 0;
+  color: #66758a;
+  line-height: 1.6;
+}
+
+.doctor-section-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.doctor-history-filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 180px;
+  gap: 10px;
+}
+
+.doctor-history-filters input {
+  border: 1px solid #d6dbe2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+}
+
 .doctor-card h2,
 .doctor-card h3 {
   margin-top: 0;
@@ -173,6 +201,11 @@
   padding: 14px;
 }
 
+.doctor-list-item--completed {
+  border-color: #e4dcf7;
+  background: linear-gradient(180deg, #ffffff 0%, #faf8ff 100%);
+}
+
 .doctor-list-item h3 {
   margin: 0 0 8px;
 }
@@ -185,6 +218,10 @@
   display: grid;
   gap: 10px;
   margin: 14px 0 16px;
+}
+
+.doctor-upload-form--modal {
+  margin: 0;
 }
 
 .doctor-upload-form label {
@@ -209,6 +246,41 @@
   min-height: 84px;
 }
 
+.doctor-report-block {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e4dcf7;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #faf8ff 0%, #f7f4fe 100%);
+}
+
+.doctor-report-block__head {
+  display: grid;
+  gap: 4px;
+}
+
+.doctor-report-block__head strong {
+  color: #4c3d89;
+}
+
+.doctor-report-block__head span {
+  color: #66758a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.doctor-appointment-docs {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eceff3;
+}
+
+.doctor-appointment-docs strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .doctor-doc-list {
   display: flex;
   flex-direction: column;
@@ -227,6 +299,112 @@
 .doctor-doc-list a {
   color: #275996;
   font-weight: 600;
+}
+
+.doctor-completed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.doctor-upload-btn--secondary {
+  border-color: #c7bde9;
+  color: #5c4c97;
+}
+
+.doctor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(25, 28, 45, 0.36);
+}
+
+.doctor-modal {
+  width: min(100%, 560px);
+  max-height: min(100vh - 40px, 720px);
+  overflow: auto;
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 28px 72px rgba(39, 26, 88, 0.22);
+}
+
+.doctor-modal__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.doctor-modal__header h3 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  color: #2d3552;
+}
+
+.doctor-modal__header p {
+  margin: 0;
+  color: #6c7190;
+}
+
+.doctor-modal__close {
+  border: 1px solid rgba(154, 132, 216, 0.18);
+  border-radius: 999px;
+  background: #fff;
+  color: #5f6786;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.doctor-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.doctor-documents-modal-list {
+  display: grid;
+  gap: 12px;
+}
+
+.doctor-documents-modal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid #e4dcf7;
+  border-radius: 14px;
+  background: #faf8ff;
+}
+
+.doctor-documents-modal-item strong {
+  display: block;
+  color: #2d3552;
+}
+
+.doctor-documents-modal-item p {
+  margin: 4px 0 0;
+  color: #6c7190;
+}
+
+.doctor-documents-modal-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid #c7bde9;
+  color: #5c4c97;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .doctor-error,
@@ -265,6 +443,16 @@
     flex-direction: column;
   }
 
+  .doctor-section-head,
+  .doctor-modal__header {
+    flex-direction: column;
+  }
+
+  .doctor-history-filters {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
   .doctor-profile-card {
     padding: 18px;
   }
@@ -275,5 +463,18 @@
 
   .doctor-profile-card__facts {
     grid-template-columns: 1fr;
+  }
+
+  .doctor-modal {
+    padding: 18px 16px;
+  }
+
+  .doctor-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .doctor-documents-modal-item {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

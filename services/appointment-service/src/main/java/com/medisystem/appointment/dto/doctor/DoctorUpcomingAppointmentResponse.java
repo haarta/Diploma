@@ -14,6 +14,12 @@ public record DoctorUpcomingAppointmentResponse(
         String status,
         String notes,
         String serviceName,
-        String completionSummary
+        String completionSummary,
+        String complaints,
+        String anamnesis,
+        String objectiveFindings,
+        String diagnosis,
+        String prescriptions,
+        String treatmentPlan
 ) {
 }

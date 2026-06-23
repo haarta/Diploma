@@ -225,6 +225,7 @@ export const filesApi = {
 export const doctorApi = {
   getMe: () => api.get('/doctor/me'),
   getUpcomingAppointments: () => api.get('/doctor/appointments/upcoming'),
+  getCompletedAppointments: () => api.get('/doctor/appointments/completed'),
   updateAppointmentStatus: (id, data) => api.patch(`/doctor/appointments/${id}/status`, data),
   getDocuments: (params) => api.get('/doctor/documents', { params }),
   uploadDocument: (file, appointmentId, type = 'OTHER') => {
@@ -251,9 +252,11 @@ export const doctorVerificationApi = {
 
 export const appointmentsApi = {
   getMine: () => api.get('/appointments/me'),
+  getMyReviews: () => api.get('/appointments/me/reviews'),
   getBusySlots: (doctorId, dateFrom, dateTo) =>
     api.get('/public/appointments/busy', { params: { doctorId, dateFrom, dateTo } }),
   createMine: (data) => api.post('/appointments/me', data),
+  createReviewMine: (id, data) => api.post(`/appointments/me/${id}/review`, data),
   cancelMine: (id) => api.patch(`/appointments/me/${id}/cancel`),
   getAll: () => api.get('/appointments'),
   getById: (id) => api.get(`/appointments/${id}`),

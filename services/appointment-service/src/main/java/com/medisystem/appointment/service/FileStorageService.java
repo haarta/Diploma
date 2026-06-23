@@ -7,6 +7,7 @@ import io.minio.PutObjectArgs;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -26,8 +27,16 @@ public class FileStorageService {
             throw new IllegalArgumentException("Необходимо выбрать файл");
         }
 
+        return uploadBytes(readFileBytes(file), folder, file.getOriginalFilename(), file.getContentType());
+    }
+
+    public FileUploadResponse uploadBytes(byte[] content, String folder, String originalFilename, String contentType) {
+        if (content == null || content.length == 0) {
+            throw new IllegalArgumentException("Необходимо передать непустой файл");
+        }
+
         String safeFolder = normalizeFolder(folder);
-        String extension = resolveExtension(file.getOriginalFilename());
+        String extension = resolveExtension(originalFilename);
         String objectKey = safeFolder + "/" + UUID.randomUUID() + extension;
 
         try {
@@ -35,8 +44,8 @@ public class FileStorageService {
                     PutObjectArgs.builder()
                             .bucket(storage.bucket())
                             .object(objectKey)
-                            .stream(file.getInputStream(), file.getSize(), -1)
-                            .contentType(file.getContentType())
+                            .stream(new ByteArrayInputStream(content), content.length, -1)
+                            .contentType(contentType)
                             .build()
             );
         } catch (Exception ex) {
@@ -45,7 +54,15 @@ public class FileStorageService {
 
         String publicUrl = trimTrailingSlash(storage.publicUrl());
         String url = publicUrl + "/" + storage.bucket() + "/" + objectKey;
-        return new FileUploadResponse(objectKey, url, file.getContentType(), file.getSize());
+        return new FileUploadResponse(objectKey, url, contentType, content.length);
+    }
+
+    private byte[] readFileBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Не удалось прочитать файл перед загрузкой", ex);
+        }
     }
 
     private String normalizeFolder(String folder) {

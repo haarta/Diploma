@@ -12,8 +12,6 @@ import {
 import {
   clearAuthTokens,
   getAccessToken,
-  getRefreshToken,
-  saveAuthTokens,
 } from '../auth';
 import '../styles/Cabinet.css';
 
@@ -40,6 +38,19 @@ const EMPTY_EDIT_FORM = {
   password: '',
   birthDate: '',
   address: '',
+};
+
+const EMPTY_REVIEW_FORM = {
+  rating: '5',
+  text: '',
+};
+
+const DOCUMENT_TYPE_LABELS = {
+  CERTIFICATE: 'Справка',
+  CONCLUSION: 'Заключение',
+  VISIT_REPORT: 'Итог приема',
+  ANALYSIS: 'Анализы',
+  OTHER: 'Документ',
 };
 
 function formatTime(value) {
@@ -85,6 +96,10 @@ function normalizeNullableText(value) {
   return trimmed || null;
 }
 
+function formatDocumentType(value) {
+  return DOCUMENT_TYPE_LABELS[value] || value || 'Документ';
+}
+
 export default function Cabinet() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -97,12 +112,19 @@ export default function Cabinet() {
   const [labResults, setLabResults] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [patientDocuments, setPatientDocuments] = useState([]);
+  const [appointmentReviews, setAppointmentReviews] = useState([]);
   const [medcardForm, setMedcardForm] = useState(EMPTY_MEDCARD_FORM);
   const [medcardMessage, setMedcardMessage] = useState('');
   const [medcardError, setMedcardError] = useState('');
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [editMessage, setEditMessage] = useState('');
   const [editError, setEditError] = useState('');
+  const [reviewForm, setReviewForm] = useState(EMPTY_REVIEW_FORM);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewAppointment, setReviewAppointment] = useState(null);
+  const [documentsAppointment, setDocumentsAppointment] = useState(null);
 
   const logout = () => {
     clearAuthTokens();
@@ -137,12 +159,14 @@ export default function Cabinet() {
     try {
       const [
         appointmentsResponse,
+        reviewsResponse,
         doctorsResponse,
         labResultsResponse,
         notificationsResponse,
         documentsResponse,
       ] = await Promise.all([
         appointmentsApi.getMine(),
+        appointmentsApi.getMyReviews(),
         doctorsApi.getAll(),
         labResultsApi.getMine(),
         notificationsApi.getMine(),
@@ -150,12 +174,14 @@ export default function Cabinet() {
       ]);
 
       setAppointments(appointmentsResponse.data || []);
+      setAppointmentReviews(reviewsResponse.data || []);
       setDoctors(doctorsResponse.data || []);
       setLabResults(labResultsResponse.data || []);
       setNotifications(notificationsResponse.data || []);
       setPatientDocuments(documentsResponse.data || []);
     } catch {
       setAppointments([]);
+      setAppointmentReviews([]);
       setDoctors([]);
       setLabResults([]);
       setNotifications([]);
@@ -237,16 +263,11 @@ export default function Cabinet() {
     }
 
     try {
-      await authSessionApi.updateMe({
+      const authResponse = await authSessionApi.updateMe({
         email: normalizeNullableText(editForm.email),
         password: normalizeNullableText(editForm.password),
       });
-
-      const refreshToken = getRefreshToken();
-      if (refreshToken) {
-        const refreshResponse = await authSessionApi.refresh(refreshToken);
-        saveAuthTokens(refreshResponse.data || {});
-      }
+      setProfile(authResponse.data || null);
     } catch {
       setEditError('Не удалось сохранить email или пароль.');
       return;
@@ -261,7 +282,19 @@ export default function Cabinet() {
         address: normalizeNullableText(editForm.address),
       };
 
-      if (patient) {
+      let currentPatient = patient;
+
+      if (!currentPatient) {
+        try {
+          const existingPatientResponse = await patientsApi.getMe();
+          currentPatient = existingPatientResponse.data || null;
+          setPatient(currentPatient);
+        } catch {
+          currentPatient = null;
+        }
+      }
+
+      if (currentPatient) {
         await patientsApi.updateMe(patientPayload);
       } else {
         if (!patientPayload.fullName || !patientPayload.phone) {
@@ -269,7 +302,7 @@ export default function Cabinet() {
           return;
         }
 
-        await patientsApi.createMe({
+        const createPayload = {
           ...patientPayload,
           gender: null,
           allergies: null,
@@ -280,7 +313,24 @@ export default function Cabinet() {
           emergencyContactPhone: null,
           heightCm: null,
           weightKg: null,
-        });
+        };
+
+        try {
+          await patientsApi.createMe(createPayload);
+        } catch (createError) {
+          try {
+            const existingPatientResponse = await patientsApi.getMe();
+            currentPatient = existingPatientResponse.data || null;
+          } catch {
+            currentPatient = null;
+          }
+
+          if (!currentPatient) {
+            throw createError;
+          }
+
+          await patientsApi.updateMe(patientPayload);
+        }
       }
 
       await loadCabinet();
@@ -319,6 +369,110 @@ export default function Cabinet() {
     await loadCabinet();
     if (item.linkPath) {
       navigate(item.linkPath);
+    }
+  };
+
+  const openVisitReport = async (item) => {
+    if (!item?.reportDocument?.fileUrl) {
+      return;
+    }
+
+    window.open(item.reportDocument.fileUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const openDocumentsModal = (event, item) => {
+    event.stopPropagation();
+    setDocumentsAppointment(item);
+  };
+
+  const closeDocumentsModal = () => {
+    setDocumentsAppointment(null);
+  };
+
+  const openReviewModal = (event, item) => {
+    event.stopPropagation();
+    setReviewAppointment(item);
+    setReviewForm(EMPTY_REVIEW_FORM);
+    setReviewError('');
+    setReviewMessage('');
+  };
+
+  const closeReviewModal = () => {
+    if (reviewSaving) {
+      return;
+    }
+    setReviewAppointment(null);
+    setReviewForm(EMPTY_REVIEW_FORM);
+    setReviewError('');
+    setReviewMessage('');
+  };
+
+  const handleReviewChange = (event) => {
+    const { name, value } = event.target;
+    setReviewForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const submitReview = async (event) => {
+    event.preventDefault();
+    if (!reviewAppointment) {
+      return;
+    }
+
+    setReviewSaving(true);
+    setReviewError('');
+    setReviewMessage('');
+
+    try {
+      await appointmentsApi.createReviewMine(reviewAppointment.id, {
+        rating: Number(reviewForm.rating),
+        text: reviewForm.text.trim(),
+      });
+      setReviewMessage('Отзыв сохранен и опубликован.');
+      await loadCabinet();
+      setReviewAppointment(null);
+      setReviewForm(EMPTY_REVIEW_FORM);
+    } catch (requestError) {
+      const message =
+        requestError?.response?.data?.error ||
+        requestError?.response?.data?.message ||
+        'Не удалось сохранить отзыв.';
+      setReviewError(message);
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const downloadVisitReport = async (event, item) => {
+    event.stopPropagation();
+
+    if (!item?.reportDocument?.fileUrl) {
+      return;
+    }
+
+    const fileName = item.reportDocument.fileName || `visit-report-${item.id}.pdf`;
+
+    try {
+      const response = await fetch(item.reportDocument.fileUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download visit report');
+      }
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      const link = document.createElement('a');
+      link.href = item.reportDocument.fileUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     }
   };
 
@@ -362,17 +516,26 @@ export default function Cabinet() {
         .map((item) => {
           const doctor = doctors.find((doctorItem) => String(doctorItem.id) === String(item.doctorId));
           const documents = patientDocuments.filter((doc) => String(doc.appointmentId) === String(item.id));
+          const reportDocument = documents.find((doc) => doc.documentType === 'VISIT_REPORT') || null;
+          const review = appointmentReviews.find((reviewItem) => String(reviewItem.appointmentId) === String(item.id)) || null;
           return {
             id: item.id,
             title: `Приём ${item.appointmentDate || 'без даты'}`,
             subtitle: doctor ? `${doctor.fullName}${doctor.specialty ? `, ${doctor.specialty}` : ''}` : 'Посещение врача',
             time: formatTime(item.appointmentTime),
             status: STATUS_LABELS[item.status] || item.status,
+            statusCode: item.status,
             completionSummary: item.completionSummary || '',
             documents,
+            doctor,
+            appointment: item,
+            reportDocument,
+            review,
+            canOpenReport: item.status === 'COMPLETED' && Boolean(reportDocument),
+            canLeaveReview: item.status === 'COMPLETED' && Boolean(doctor) && !review,
           };
         }),
-    [appointments, doctors, patientDocuments]
+    [appointments, appointmentReviews, doctors, patientDocuments]
   );
 
   const labResultCards = useMemo(
@@ -484,19 +647,57 @@ export default function Cabinet() {
               <p className="cabinet-hint">Завершённых приёмов пока нет.</p>
             ) : (
               visitsItems.map((item) => (
-                <div className="cabinet-list-item" key={item.id}>
+                <div
+                  className={`cabinet-list-item${item.canOpenReport ? ' cabinet-list-item--interactive' : ''}`}
+                  key={item.id}
+                  onClick={() => openVisitReport(item)}
+                  onKeyDown={(event) => {
+                    if (item.canOpenReport && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      openVisitReport(item);
+                    }
+                  }}
+                  role={item.canOpenReport ? 'button' : undefined}
+                  tabIndex={item.canOpenReport ? 0 : undefined}
+                >
                   <h4>{item.title}</h4>
                   <p>{item.subtitle}</p>
                   <p><strong>Время:</strong> {item.time}</p>
                   <p><strong>Статус:</strong> {item.status}</p>
                   {item.completionSummary ? <p><strong>Заключение:</strong> {item.completionSummary}</p> : null}
-                  {item.documents.length > 0 ? (
-                    <div className="cabinet-doc-links">
-                      {item.documents.map((doc) => (
-                        <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer">
-                          {doc.fileName}
-                        </a>
-                      ))}
+                  {item.canOpenReport ? (
+                    <div className="cabinet-visit-actions">
+                      <button
+                        className="cabinet-inline-action"
+                        type="button"
+                        onClick={(event) => openDocumentsModal(event, item)}
+                      >
+                        Документы приема
+                      </button>
+                      {item.reportDocument ? (
+                        <button
+                          className="cabinet-inline-action cabinet-inline-action--secondary"
+                          type="button"
+                          onClick={(event) => downloadVisitReport(event, item)}
+                        >
+                          Скачать PDF заключения
+                        </button>
+                      ) : null}
+                      {item.canLeaveReview ? (
+                        <button
+                          className="cabinet-inline-action cabinet-inline-action--lavender"
+                          type="button"
+                          onClick={(event) => openReviewModal(event, item)}
+                        >
+                          Оставить отзыв о враче
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {item.review ? (
+                    <div className="cabinet-review-summary">
+                      <strong>Ваш отзыв:</strong>
+                      <span>{`★ ${item.review.rating} • ${item.review.text}`}</span>
                     </div>
                   ) : null}
                 </div>
@@ -631,7 +832,7 @@ export default function Cabinet() {
     return <Navigate to="/cabinet/info" replace />;
   };
 
-  return (
+  const pageMarkup = (
     <section className="cabinet-page">
       <div className="cabinet-top">
         <div>
@@ -676,5 +877,104 @@ export default function Cabinet() {
         </aside>
       </div>
     </section>
+  );
+
+  return (
+    <>
+      {pageMarkup}
+      {documentsAppointment ? (
+        <div className="cabinet-modal-backdrop" onClick={closeDocumentsModal}>
+          <div className="cabinet-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="cabinet-modal__header">
+              <div>
+                <h3>Документы приема</h3>
+                <p>{documentsAppointment.subtitle}</p>
+              </div>
+              <button type="button" className="cabinet-modal__close" onClick={closeDocumentsModal}>
+                Закрыть
+              </button>
+            </div>
+
+            <div className="cabinet-documents-modal-list">
+              {documentsAppointment.documents.map((doc) => (
+                <article className="cabinet-documents-modal-item" key={doc.id}>
+                  <div>
+                    <strong>{formatDocumentType(doc.documentType)}</strong>
+                    <p>{doc.fileName}</p>
+                  </div>
+                  <a
+                    className="cabinet-documents-modal-link"
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Открыть
+                  </a>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {reviewAppointment ? (
+        <div className="cabinet-modal-backdrop" onClick={closeReviewModal}>
+          <div className="cabinet-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="cabinet-modal__header">
+              <div>
+                <h3>Отзыв о враче</h3>
+                <p>{reviewAppointment.subtitle}</p>
+              </div>
+              <button type="button" className="cabinet-modal__close" onClick={closeReviewModal}>
+                Закрыть
+              </button>
+            </div>
+
+            <form className="cabinet-review-form" onSubmit={submitReview}>
+              <label className="cabinet-medcard-field">
+                <span>Оценка</span>
+                <select name="rating" value={reviewForm.rating} onChange={handleReviewChange} disabled={reviewSaving}>
+                  <option value="5">5</option>
+                  <option value="4">4</option>
+                  <option value="3">3</option>
+                  <option value="2">2</option>
+                  <option value="1">1</option>
+                </select>
+              </label>
+
+              <label className="cabinet-medcard-field cabinet-review-form__full">
+                <span>Текст отзыва</span>
+                <textarea
+                  className="cabinet-medcard-textarea"
+                  name="text"
+                  rows="6"
+                  value={reviewForm.text}
+                  onChange={handleReviewChange}
+                  placeholder="Опишите, как прошел прием и чем врач помог."
+                  disabled={reviewSaving}
+                  required
+                />
+              </label>
+
+              {reviewError ? <p className="cabinet-error cabinet-review-form__full">{reviewError}</p> : null}
+              {reviewMessage ? <p className="cabinet-success cabinet-review-form__full">{reviewMessage}</p> : null}
+
+              <div className="cabinet-visit-actions cabinet-review-form__full">
+                <button className="cabinet-inline-action cabinet-inline-action--lavender" type="submit" disabled={reviewSaving}>
+                  {reviewSaving ? 'Сохранение...' : 'Опубликовать отзыв'}
+                </button>
+                <button
+                  className="cabinet-inline-action cabinet-inline-action--secondary"
+                  type="button"
+                  onClick={closeReviewModal}
+                  disabled={reviewSaving}
+                >
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

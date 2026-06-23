@@ -45,6 +45,13 @@ public class DoctorWorkspaceController {
         return doctorWorkspaceService.getUpcomingAppointments(principal.getUserId());
     }
 
+    @GetMapping("/appointments/completed")
+    public List<DoctorUpcomingAppointmentResponse> getCompletedAppointments(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return doctorWorkspaceService.getCompletedAppointments(principal.getUserId());
+    }
+
     @PatchMapping("/appointments/{id}/status")
     public DoctorUpcomingAppointmentResponse updateAppointmentStatus(
             @AuthenticationPrincipal UserPrincipal principal,

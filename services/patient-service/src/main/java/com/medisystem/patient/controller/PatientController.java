@@ -20,19 +20,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.NO_CONTENT;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @RestController
 @RequestMapping("/api/patients")
 public class PatientController {
 
     private final PatientService service;
+    private final String internalServiceToken;
 
-    public PatientController(PatientService service) {
+    public PatientController(
+            PatientService service,
+            @Value("${internal.service-token}") String internalServiceToken
+    ) {
         this.service = service;
+        this.internalServiceToken = internalServiceToken;
     }
 
     @PostMapping("/me")
@@ -46,6 +55,17 @@ public class PatientController {
     @GetMapping("/me")
     public PatientResponse getMine(@AuthenticationPrincipal UserPrincipal principal) {
         return toResponse(service.getByUserId(principal.getUserId()));
+    }
+
+    @GetMapping("/internal/{id}")
+    public PatientResponse getInternal(
+            @PathVariable Long id,
+            @RequestHeader(name = "X-Service-Token", required = false) String serviceToken
+    ) {
+        if (serviceToken == null || !serviceToken.equals(internalServiceToken)) {
+            throw new ResponseStatusException(FORBIDDEN, "Invalid internal service token");
+        }
+        return toResponse(service.get(id));
     }
 
     @PatchMapping("/me")

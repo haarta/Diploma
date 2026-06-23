@@ -27,6 +27,8 @@ import java.util.Set;
 @Service
 public class DoctorWorkspaceService {
 
+    private static final String VISIT_REPORT_DOCUMENT_TYPE = "VISIT_REPORT";
+
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
             "application/pdf",
             "image/png",
@@ -38,6 +40,8 @@ public class DoctorWorkspaceService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorMedicalDocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
+    private final PatientProfileClient patientProfileClient;
+    private final VisitReportPdfService visitReportPdfService;
     private final UserNotificationService userNotificationService;
 
     public DoctorWorkspaceService(
@@ -45,12 +49,16 @@ public class DoctorWorkspaceService {
             AppointmentRepository appointmentRepository,
             DoctorMedicalDocumentRepository documentRepository,
             FileStorageService fileStorageService,
+            PatientProfileClient patientProfileClient,
+            VisitReportPdfService visitReportPdfService,
             UserNotificationService userNotificationService
     ) {
         this.doctorRepository = doctorRepository;
         this.appointmentRepository = appointmentRepository;
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
+        this.patientProfileClient = patientProfileClient;
+        this.visitReportPdfService = visitReportPdfService;
         this.userNotificationService = userNotificationService;
     }
 
@@ -66,12 +74,23 @@ public class DoctorWorkspaceService {
         return appointmentRepository
                 .findAllByDoctorIdAndAppointmentDateGreaterThanEqualOrderByAppointmentDateAscAppointmentTimeAsc(
                         doctor.getId(),
-                        LocalDate.now()
+                        ClinicTime.today()
                 )
                 .stream()
                 .filter(item -> item.getStatus() != AppointmentStatus.CANCELLED)
                 .filter(item -> item.getStatus() != AppointmentStatus.COMPLETED)
                 .filter(item -> item.getStatus() != AppointmentStatus.NO_SHOW)
+                .map(this::toUpcomingResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DoctorUpcomingAppointmentResponse> getCompletedAppointments(long userId) {
+        Doctor doctor = findDoctorByUserId(userId);
+        return appointmentRepository
+                .findAllByDoctorIdOrderByAppointmentDateDescAppointmentTimeDesc(doctor.getId())
+                .stream()
+                .filter(item -> item.getStatus() == AppointmentStatus.COMPLETED)
                 .map(this::toUpcomingResponse)
                 .toList();
     }
@@ -90,9 +109,11 @@ public class DoctorWorkspaceService {
         }
 
         AppointmentStatus nextStatus = parseDoctorStatus(request.status());
+        applyReportFields(appointment, request);
         appointment.setStatus(nextStatus);
         if (nextStatus == AppointmentStatus.COMPLETED) {
-            appointment.setCompletedAt(OffsetDateTime.now());
+            validateCompletionReport(appointment);
+            appointment.setCompletedAt(ClinicTime.nowOffset());
             appointment.setCompletionSummary(normalizeNullableText(request.completionSummary()));
         } else if (nextStatus == AppointmentStatus.CONFIRMED) {
             appointment.setCompletionSummary(normalizeNullableText(request.completionSummary()));
@@ -101,6 +122,9 @@ public class DoctorWorkspaceService {
         }
 
         Appointment saved = appointmentRepository.save(appointment);
+        if (nextStatus == AppointmentStatus.COMPLETED) {
+            createOrUpdateVisitReport(saved, doctor);
+        }
         if (saved.getCreatedByUserId() != null) {
             userNotificationService.createNotification(
                     saved.getCreatedByUserId(),
@@ -218,6 +242,60 @@ public class DoctorWorkspaceService {
         return normalized.isBlank() ? "document" : normalized;
     }
 
+    private void applyReportFields(Appointment appointment, DoctorAppointmentStatusUpdateRequest request) {
+        appointment.setComplaints(normalizeNullableText(request.complaints()));
+        appointment.setAnamnesis(normalizeNullableText(request.anamnesis()));
+        appointment.setObjectiveFindings(normalizeNullableText(request.objectiveFindings()));
+        appointment.setDiagnosis(normalizeNullableText(request.diagnosis()));
+        appointment.setPrescriptions(normalizeNullableText(request.prescriptions()));
+        appointment.setTreatmentPlan(normalizeNullableText(request.treatmentPlan()));
+    }
+
+    private void validateCompletionReport(Appointment appointment) {
+        requireField(appointment.getComplaints(), "жалобы");
+        requireField(appointment.getAnamnesis(), "анамнез");
+        requireField(appointment.getObjectiveFindings(), "объективные данные");
+        requireField(appointment.getDiagnosis(), "диагноз");
+        requireField(appointment.getPrescriptions(), "назначения");
+        requireField(appointment.getTreatmentPlan(), "план лечения");
+    }
+
+    private void requireField(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Для завершения приема необходимо заполнить поле: " + label);
+        }
+    }
+
+    private void createOrUpdateVisitReport(Appointment appointment, Doctor doctor) {
+        PatientProfileClient.PatientProfileSnapshot patient = patientProfileClient.getPatientById(appointment.getPatientId());
+        byte[] pdfBytes = visitReportPdfService.generate(appointment, doctor, patient);
+        FileUploadResponse upload = fileStorageService.uploadBytes(
+                pdfBytes,
+                "doctor-documents/" + doctor.getId() + "/visit-reports",
+                buildVisitReportFileName(appointment),
+                "application/pdf"
+        );
+
+        DoctorMedicalDocument document = documentRepository
+                .findFirstByAppointmentIdAndDocumentTypeOrderByCreatedAtDesc(appointment.getId(), VISIT_REPORT_DOCUMENT_TYPE)
+                .orElseGet(DoctorMedicalDocument::new);
+
+        document.setDoctorId(doctor.getId());
+        document.setPatientId(appointment.getPatientId());
+        document.setAppointmentId(appointment.getId());
+        document.setDocumentType(VISIT_REPORT_DOCUMENT_TYPE);
+        document.setFileName(buildVisitReportFileName(appointment));
+        document.setContentType(upload.contentType());
+        document.setFileSize(upload.size());
+        document.setFileKey(upload.key());
+        document.setFileUrl(upload.url());
+        documentRepository.save(document);
+    }
+
+    private String buildVisitReportFileName(Appointment appointment) {
+        return "visit-report-" + appointment.getId() + ".pdf";
+    }
+
     private DoctorUpcomingAppointmentResponse toUpcomingResponse(Appointment appointment) {
         return new DoctorUpcomingAppointmentResponse(
                 appointment.getId(),
@@ -230,7 +308,13 @@ public class DoctorWorkspaceService {
                 appointment.getStatus().name(),
                 appointment.getNotes(),
                 appointment.getServiceName(),
-                appointment.getCompletionSummary()
+                appointment.getCompletionSummary(),
+                appointment.getComplaints(),
+                appointment.getAnamnesis(),
+                appointment.getObjectiveFindings(),
+                appointment.getDiagnosis(),
+                appointment.getPrescriptions(),
+                appointment.getTreatmentPlan()
         );
     }
 

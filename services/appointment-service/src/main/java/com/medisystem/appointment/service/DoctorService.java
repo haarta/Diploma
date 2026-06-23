@@ -224,6 +224,7 @@ public class DoctorService {
         return new DoctorReviewItem(
                 review.getId(),
                 review.getDoctor().getId(),
+                review.getAppointmentId(),
                 review.getAuthorName(),
                 review.getRating(),
                 review.getText(),

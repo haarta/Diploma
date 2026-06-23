@@ -1,8 +1,10 @@
 package com.medisystem.appointment.controller;
 
 import com.medisystem.appointment.dto.AppointmentCreateRequest;
+import com.medisystem.appointment.dto.AppointmentReviewCreateRequest;
 import com.medisystem.appointment.dto.AppointmentResponse;
 import com.medisystem.appointment.dto.AppointmentUpdateRequest;
+import com.medisystem.appointment.dto.shared.DoctorReviewItem;
 import com.medisystem.appointment.entity.Appointment;
 import com.medisystem.appointment.security.UserPrincipal;
 import com.medisystem.appointment.service.AppointmentService;
@@ -41,6 +43,11 @@ public class AppointmentController {
                 .toList();
     }
 
+    @GetMapping("/me/reviews")
+    public List<DoctorReviewItem> getMyReviews(@AuthenticationPrincipal UserPrincipal principal) {
+        return service.getMyReviews(principal.getUserId());
+    }
+
     @PostMapping("/me")
     public AppointmentResponse createMine(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -55,6 +62,15 @@ public class AppointmentController {
             @PathVariable Long id
     ) {
         return toResponse(service.cancelMine(principal.getUserId(), id));
+    }
+
+    @PostMapping("/me/{id}/review")
+    public DoctorReviewItem createReviewMine(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody AppointmentReviewCreateRequest req
+    ) {
+        return service.createReviewMine(principal.getUserId(), id, req);
     }
 
     @GetMapping

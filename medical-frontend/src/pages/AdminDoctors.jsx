@@ -28,6 +28,16 @@ const reviewStatusLabels = {
   REJECTED: 'Отклонен',
 };
 
+const DAY_OF_WEEK_OPTIONS = [
+  { value: 'MONDAY', label: 'Понедельник' },
+  { value: 'TUESDAY', label: 'Вторник' },
+  { value: 'WEDNESDAY', label: 'Среда' },
+  { value: 'THURSDAY', label: 'Четверг' },
+  { value: 'FRIDAY', label: 'Пятница' },
+  { value: 'SATURDAY', label: 'Суббота' },
+  { value: 'SUNDAY', label: 'Воскресенье' },
+];
+
 const getApiErrorMessage = (error, fallbackMessage) => {
   const status = error?.response?.status;
   const apiMessage = error?.response?.data?.error || error?.response?.data?.message;
@@ -265,7 +275,13 @@ export default function AdminDoctors() {
         <h3>Расписание</h3>
         {form.schedules.map((item, idx) => (
           <div key={`schedule-${idx}`} className="page-row-actions">
-            <input className="form-control" placeholder="День недели" value={item.dayOfWeek} onChange={(e) => updateListField('schedules', idx, 'dayOfWeek', e.target.value)} />
+            <select className="form-control" value={item.dayOfWeek} onChange={(e) => updateListField('schedules', idx, 'dayOfWeek', e.target.value)}>
+              {DAY_OF_WEEK_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <input className="form-control" placeholder="Начало" value={item.startTime} onChange={(e) => updateListField('schedules', idx, 'startTime', e.target.value)} />
             <input className="form-control" placeholder="Конец" value={item.endTime} onChange={(e) => updateListField('schedules', idx, 'endTime', e.target.value)} />
             <button className="btn btn-danger btn-small" type="button" onClick={() => removeListRow('schedules', idx)}>Удалить</button>

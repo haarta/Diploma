@@ -54,7 +54,7 @@ public class AppointmentReminderScheduler {
     @Scheduled(fixedDelayString = "${app.scheduling.reminders-delay-ms:300000}")
     @Transactional
     public void publishDueReminders() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = ClinicTime.today();
         LocalDate targetDate = today.plusDays(2);
         List<Appointment> appointments = appointmentRepository
                 .findAllByAppointmentDateBetweenAndStatusInOrderByAppointmentDateAscAppointmentTimeAsc(
@@ -68,13 +68,18 @@ public class AppointmentReminderScheduler {
                 ).stream()
                 .collect(Collectors.toMap(Doctor::getId, item -> item));
 
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = ClinicTime.nowOffset();
         for (Appointment appointment : appointments) {
-            if (appointment.getCreatedByUserId() == null || appointment.getPatientEmail() == null || appointment.getPatientEmail().isBlank()) {
+            if (appointment.getCreatedByUserId() == null
+                    || appointment.getPatientEmail() == null
+                    || appointment.getPatientEmail().isBlank()) {
                 continue;
             }
 
-            LocalDateTime appointmentDateTime = LocalDateTime.of(appointment.getAppointmentDate(), appointment.getAppointmentTime());
+            LocalDateTime appointmentDateTime = LocalDateTime.of(
+                    appointment.getAppointmentDate(),
+                    appointment.getAppointmentTime()
+            );
             long minutesUntil = Duration.between(now.toLocalDateTime(), appointmentDateTime).toMinutes();
             if (minutesUntil <= 0) {
                 continue;
@@ -82,14 +87,22 @@ public class AppointmentReminderScheduler {
 
             Doctor doctor = doctorsById.get(appointment.getDoctorId());
             if (minutesUntil <= 24 * 60 && appointment.getReminder24hSentAt() == null) {
+                boolean sameDayAppointment = appointment.getAppointmentDate().isEqual(today);
+                String reminderTitle = sameDayAppointment
+                        ? "Напоминание о приёме сегодня"
+                        : "Напоминание о приёме завтра";
+                String reminderMessage = sameDayAppointment
+                        ? "Напоминаем о приёме сегодня в " + appointment.getAppointmentTime() + "."
+                        : "Напоминаем о приёме " + appointment.getAppointmentDate() + " в " + appointment.getAppointmentTime() + ".";
+
                 appointmentEventPublisher.publishReminder(appointment, doctor, "REMINDER_24H");
                 appointment.setReminder24hSentAt(now);
                 userNotificationService.createNotification(
                         appointment.getCreatedByUserId(),
                         appointment.getId(),
                         "REMINDER",
-                        "Напоминание о приёме завтра",
-                        "Напоминаем о приёме " + appointment.getAppointmentDate() + " в " + appointment.getAppointmentTime() + ".",
+                        reminderTitle,
+                        reminderMessage,
                         "/cabinet/services"
                 );
             }
@@ -110,10 +123,37 @@ public class AppointmentReminderScheduler {
         appointmentRepository.saveAll(appointments);
     }
 
+    @Scheduled(fixedDelayString = "${app.scheduling.appointments-finalize-delay-ms:300000}")
+    @Transactional
+    public void finalizePastAppointments() {
+        LocalDateTime now = ClinicTime.nowDateTime();
+        OffsetDateTime completedAt = ClinicTime.nowOffset();
+
+        List<Appointment> appointmentsToComplete = appointmentRepository
+                .findAllByStatusInOrderByAppointmentDateAscAppointmentTimeAsc(List.copyOf(ACTIVE_STATUSES))
+                .stream()
+                .filter(item -> item.getAppointmentDate() != null && item.getAppointmentTime() != null)
+                .filter(item -> LocalDateTime.of(item.getAppointmentDate(), item.getAppointmentTime()).isBefore(now))
+                .toList();
+
+        if (appointmentsToComplete.isEmpty()) {
+            return;
+        }
+
+        for (Appointment appointment : appointmentsToComplete) {
+            appointment.setStatus(AppointmentStatus.COMPLETED);
+            if (appointment.getCompletedAt() == null) {
+                appointment.setCompletedAt(completedAt);
+            }
+        }
+
+        appointmentRepository.saveAll(appointmentsToComplete);
+    }
+
     @Scheduled(fixedDelayString = "${app.scheduling.lab-results-delay-ms:600000}")
     @Transactional
     public void finalizeLabResults() {
-        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime now = ClinicTime.nowOffset();
         List<LabResult> dueResults = labResultRepository.findAll().stream()
                 .filter(item -> item.getStatus() == LabResultStatus.PROCESSING)
                 .filter(item -> item.getReadyAt() != null)

@@ -70,6 +70,7 @@ services:
       DB_USER: patient_user
       DB_PASSWORD: ${PATIENT_DB_PASSWORD}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-diploma_internal_service_token}
     ports:
       - "8082:8082"
 
@@ -151,6 +152,8 @@ services:
       MINIO_PUBLIC_READ: ${MINIO_PUBLIC_READ}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-notification-service}
+      PATIENT_SERVICE_URL: http://patient-service:8082/api/patients/internal
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-diploma_internal_service_token}
     ports:
       - "8083:8083"
 

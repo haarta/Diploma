@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { doctorsApi } from '../api';
 import {
   buildSections,
@@ -11,7 +11,7 @@ import {
 import '../styles/ServicesCatalog.css';
 
 export default function ServicesCatalog() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialSectionId = SECTION_DEFINITIONS.some((section) => section.id === searchParams.get('section'))
     ? searchParams.get('section')
     : SECTION_DEFINITIONS[0].id;
@@ -34,7 +34,11 @@ export default function ServicesCatalog() {
 
   useEffect(() => {
     const sectionParam = searchParams.get('section');
-    const matchedSection = sections.find((section) => section.id === sectionParam) || sections[0];
+    if (!sectionParam) {
+      return;
+    }
+
+    const matchedSection = sections.find((section) => section.id === sectionParam);
 
     if (!matchedSection) {
       return;
@@ -85,7 +89,30 @@ export default function ServicesCatalog() {
   }, [activeSection, selectedCategoryIds]);
 
   const handleSectionSelect = (sectionId) => {
+    const nextSection = sections.find((section) => section.id === sectionId);
+    if (!nextSection) {
+      return;
+    }
+
     setActiveSectionId(sectionId);
+
+    const nextCategoryId = selectedCategoryIds[sectionId] || nextSection.items[0]?.id || null;
+
+    if (nextCategoryId) {
+      setSelectedCategoryIds((prev) => ({
+        ...prev,
+        [sectionId]: nextCategoryId,
+      }));
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('section', sectionId);
+    if (nextCategoryId) {
+      nextParams.set('category', nextCategoryId);
+    } else {
+      nextParams.delete('category');
+    }
+    setSearchParams(nextParams);
   };
 
   const handleCategorySelect = (categoryId) => {
@@ -93,6 +120,11 @@ export default function ServicesCatalog() {
       ...prev,
       [activeSection.id]: categoryId,
     }));
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('section', activeSection.id);
+    nextParams.set('category', categoryId);
+    setSearchParams(nextParams);
   };
 
   if (isLoading) {
@@ -191,6 +223,17 @@ export default function ServicesCatalog() {
                         ))}
                       </div>
                     </div>
+
+                    {activeSection.id === 'main' ? (
+                      <div className="service-detail-card__actions">
+                        <Link
+                          className="btn btn-primary service-detail-card__action"
+                          to={`/appointments?specialty=${encodeURIComponent(selectedCategory.title)}`}
+                        >
+                          Оформить
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               ) : null}

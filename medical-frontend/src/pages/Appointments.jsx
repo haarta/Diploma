@@ -169,6 +169,7 @@ export default function Appointments() {
   const tokenPayload = useMemo(() => getTokenPayload(), [sessionToken]);
 
   const selectedDoctorIdFromUrl = searchParams.get('doctorId') || '';
+  const selectedSpecialtyFromUrl = searchParams.get('specialty') || '';
 
   useEffect(() => {
     const unsubscribe = subscribeAuthChange(() => {
@@ -230,6 +231,24 @@ export default function Appointments() {
 
     return [...new Set(values)].sort((a, b) => a.localeCompare(b, 'ru'));
   }, [doctors]);
+
+  useEffect(() => {
+    if (!selectedSpecialtyFromUrl || !specialties.length || selectedDoctorIdFromUrl) {
+      return;
+    }
+
+    const specialtyFromUrl = specialties.find((specialty) => specialty === selectedSpecialtyFromUrl);
+    if (!specialtyFromUrl) {
+      return;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      specialty: specialtyFromUrl,
+      doctorId: '',
+      service: '',
+    }));
+  }, [selectedDoctorIdFromUrl, selectedSpecialtyFromUrl, specialties]);
 
   const filteredDoctors = useMemo(() => {
     if (!filters.specialty) {

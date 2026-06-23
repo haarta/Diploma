@@ -19,6 +19,7 @@ function getAverageRating(reviews) {
 
 export default function Doctors() {
   const [searchParams] = useSearchParams();
+  const [expandedDoctorId, setExpandedDoctorId] = useState(null);
   const [filters, setFilters] = useState({
     ...INITIAL_FILTERS,
     search: searchParams.get('search') || '',
@@ -71,6 +72,11 @@ export default function Doctors() {
       .map(([specialty, items]) => ({ specialty, items }));
   }, [filteredDoctors]);
 
+  const totalReviews = useMemo(
+    () => filteredDoctors.reduce((total, doctor) => total + (doctor.reviews?.length || 0), 0),
+    [filteredDoctors]
+  );
+
   useEffect(() => {
     const nextSearch = searchParams.get('search') || '';
 
@@ -87,12 +93,41 @@ export default function Doctors() {
     });
   }, [searchParams]);
 
+  const toggleReviews = (doctorId) => {
+    setExpandedDoctorId((current) => (current === doctorId ? null : doctorId));
+  };
+
   if (isLoading) {
     return <div className="loading">Загрузка врачей...</div>;
   }
 
   return (
     <section className="doctors-catalog">
+      <section className="doctors-hero">
+        <div>
+          <span className="doctors-hero__badge">Врачи клиники</span>
+          <h1>Найдите нужного врача за пару кликов</h1>
+          <p>
+            Фильтруйте каталог по направлению и быстро переходите к записи на прием.
+          </p>
+        </div>
+
+        <div className="doctors-hero__stats" aria-label="Статистика каталога">
+          <div>
+            <strong>{filteredDoctors.length}</strong>
+            <span>специалистов доступно</span>
+          </div>
+          <div>
+            <strong>{specialties.length}</strong>
+            <span>направлений в каталоге</span>
+          </div>
+          <div>
+            <strong>{totalReviews}</strong>
+            <span>отзывов от пациентов</span>
+          </div>
+        </div>
+      </section>
+
       <div className="doctors-filters">
         <input
           className="doctors-search"
@@ -133,40 +168,80 @@ export default function Doctors() {
               {group.items.map((doctor) => {
                 const reviewsCount = doctor.reviews?.length || 0;
                 const rating = getAverageRating(doctor.reviews);
+                const isReviewsOpen = expandedDoctorId === doctor.id;
 
                 return (
-                  <article key={doctor.id} className="doctor-card-catalog">
-                    <div className="doctor-card-content">
-                      <div className="doctor-meta-top">
-                        <span className="doctor-rating-text">{rating ? `★ ${rating}` : '★'}</span>
-                        <span className="doctor-reviews-link">Отзывы ({reviewsCount})</span>
+                  <article
+                    key={doctor.id}
+                    className={`doctor-card-catalog${isReviewsOpen ? ' doctor-card-catalog--expanded' : ''}`}
+                  >
+                    <div className="doctor-card-shell">
+                      <div className="doctor-card-content">
+                        <div className="doctor-meta-top">
+                          <span className="doctor-rating-text">{rating ? `★ ${rating}` : '★'}</span>
+                          {reviewsCount > 0 ? (
+                            <button
+                              type="button"
+                              className="doctor-reviews-toggle"
+                              onClick={() => toggleReviews(doctor.id)}
+                            >
+                              {isReviewsOpen ? 'Свернуть отзывы' : `Отзывы (${reviewsCount})`}
+                            </button>
+                          ) : (
+                            <span className="doctor-reviews-link">Отзывов пока нет</span>
+                          )}
+                        </div>
+
+                        <h3 className="doctor-name">{doctor.fullName}</h3>
+                        <p className="doctor-specialty">{doctor.specialty || UNKNOWN_SPECIALTY}</p>
+
+                        <div className="doctor-meta-list">
+                          <p>
+                            <strong>Стаж:</strong> {doctor.experienceYears ?? 'не указан'} лет
+                          </p>
+                        </div>
+
+                        {doctor.description ? <p className="doctor-description">{doctor.description}</p> : null}
+
+                        <div className="doctor-card-actions">
+                          <Link className="doctor-appointment-btn" to={`/appointments?doctorId=${doctor.id}`}>
+                            Записаться на прием
+                          </Link>
+                        </div>
                       </div>
 
-                      <h3 className="doctor-name">{doctor.fullName}</h3>
-                      <p className="doctor-specialty">{doctor.specialty || UNKNOWN_SPECIALTY}</p>
-
-                      <div className="doctor-meta-list">
-                        <p>
-                          <strong>Стаж:</strong> {doctor.experienceYears ?? 'не указан'} лет
-                        </p>
-                      </div>
-
-                      {doctor.description ? <p className="doctor-description">{doctor.description}</p> : null}
-
-                      <div className="doctor-card-actions">
-                        <Link className="doctor-appointment-btn" to={`/appointments?doctorId=${doctor.id}`}>
-                          Записаться на прием
-                        </Link>
+                      <div className="doctor-photo-wrap">
+                        {doctor.photoUrl ? (
+                          <img src={doctor.photoUrl} alt={doctor.fullName} className="doctor-photo" loading="lazy" />
+                        ) : (
+                          <div className="doctor-photo-placeholder">Фото</div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="doctor-photo-wrap">
-                      {doctor.photoUrl ? (
-                        <img src={doctor.photoUrl} alt={doctor.fullName} className="doctor-photo" loading="lazy" />
-                      ) : (
-                        <div className="doctor-photo-placeholder">Фото</div>
-                      )}
-                    </div>
+                    {isReviewsOpen ? (
+                      <section className="doctor-reviews-expanded">
+                        <div className="doctor-reviews-expanded__head">
+                          <div>
+                            <h4>Отзывы о враче</h4>
+                            <p>Реальные отклики пациентов по завершенным приемам.</p>
+                          </div>
+                          <span className="doctor-reviews-expanded__count">{reviewsCount}</span>
+                        </div>
+
+                        <div className="doctor-reviews-scroller">
+                          {doctor.reviews.map((review) => (
+                            <article key={review.id} className="doctor-review-card">
+                              <div className="doctor-review-card__meta">
+                                <strong>{review.authorName}</strong>
+                                <span>{`★ ${review.rating}`}</span>
+                              </div>
+                              <p>{review.text}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
                   </article>
                 );
               })}

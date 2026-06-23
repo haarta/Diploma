@@ -26,8 +26,17 @@ public class PatientService {
 
     @Transactional
     public Patient create(PatientCreateRequest req) {
-        if (req.userId != null && repo.existsByUserIdAndActiveTrue(req.userId)) {
-            throw new IllegalArgumentException("Профиль пациента для этого пользователя уже существует");
+        if (req.userId != null) {
+            var existing = repo.findByUserId(req.userId).orElse(null);
+            if (existing != null) {
+                if (existing.isActive()) {
+                    throw new IllegalArgumentException("Patient profile already exists for this user");
+                }
+
+                applyCreate(existing, req);
+                existing.setActive(true);
+                return repo.save(existing);
+            }
         }
 
         var patient = new Patient(
@@ -59,13 +68,13 @@ public class PatientService {
     @Transactional(readOnly = true)
     public Patient get(Long id) {
         return repo.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new PatientNotFoundException("Пациент не найден: " + id));
+                .orElseThrow(() -> new PatientNotFoundException("Patient not found: " + id));
     }
 
     @Transactional(readOnly = true)
     public Patient getByUserId(Long userId) {
         return repo.findByUserIdAndActiveTrue(userId)
-                .orElseThrow(() -> new PatientNotFoundException("Пациент не найден для указанного пользователя: " + userId));
+                .orElseThrow(() -> new PatientNotFoundException("Patient not found for user: " + userId));
     }
 
     @Transactional(readOnly = true)
@@ -115,10 +124,28 @@ public class PatientService {
         repo.save(patient);
     }
 
+    private void applyCreate(Patient patient, PatientCreateRequest req) {
+        patient.setUserId(req.userId);
+        patient.setFullName(req.fullName);
+        patient.setBirthDate(req.birthDate);
+        patient.setPhone(req.phone);
+        patient.setEmail(req.email);
+        patient.setGender(req.gender);
+        patient.setAddress(req.address);
+        patient.setAllergies(req.allergies);
+        patient.setChronicConditions(req.chronicConditions);
+        patient.setBloodGroup(req.bloodGroup);
+        patient.setRhFactor(req.rhFactor);
+        patient.setHeightCm(req.heightCm);
+        patient.setWeightKg(req.weightKg);
+        patient.setEmergencyContactName(req.emergencyContactName);
+        patient.setEmergencyContactPhone(req.emergencyContactPhone);
+    }
+
     private void applyPatch(Patient patient, PatientUpdateRequest req) {
         if (req.userId != null) {
             if (!req.userId.equals(patient.getUserId()) && repo.existsByUserIdAndActiveTrue(req.userId)) {
-            throw new IllegalArgumentException("Профиль пациента для этого пользователя уже существует");
+                throw new IllegalArgumentException("Patient profile already exists for this user");
             }
             patient.setUserId(req.userId);
         }

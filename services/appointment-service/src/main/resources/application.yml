@@ -62,3 +62,7 @@ storage:
     secret-key: ${MINIO_SECRET_KEY:minioadmin123}
     bucket: ${MINIO_BUCKET:doctor-files}
     public-read: ${MINIO_PUBLIC_READ:true}
+
+patient-service:
+  base-url: ${PATIENT_SERVICE_URL:http://patient-service:8082/api/patients/internal}
+  token: ${INTERNAL_SERVICE_TOKEN:change_me_internal_service_token}

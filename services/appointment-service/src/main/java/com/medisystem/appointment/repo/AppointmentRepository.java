@@ -31,10 +31,16 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             List<AppointmentStatus> statuses
     );
 
+    List<Appointment> findAllByStatusInOrderByAppointmentDateAscAppointmentTimeAsc(
+            List<AppointmentStatus> statuses
+    );
+
     List<Appointment> findAllByDoctorIdAndAppointmentDateGreaterThanEqualOrderByAppointmentDateAscAppointmentTimeAsc(
             Long doctorId,
             LocalDate appointmentDate
     );
+
+    List<Appointment> findAllByDoctorIdOrderByAppointmentDateDescAppointmentTimeDesc(Long doctorId);
 
     List<Appointment> findAllByDoctorIdAndAppointmentDateAndStatusNotOrderByAppointmentTimeAsc(
             Long doctorId,

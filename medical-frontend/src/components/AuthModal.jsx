@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   clearAuthTokens,
@@ -25,6 +26,7 @@ function extractErrorMessage(error) {
 export default function AuthModal() {
   const navigate = useNavigate();
   const location = useLocation();
+  const modalContentRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -84,6 +86,14 @@ export default function AuthModal() {
       setIsOpen(false);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (!isOpen || !modalContentRef.current) {
+      return;
+    }
+
+    modalContentRef.current.scrollTop = 0;
+  }, [isOpen, mode]);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -170,8 +180,108 @@ export default function AuthModal() {
     navigate('/?auth=register');
   };
 
+  const modalMarkup = (
+    <div className={`auth-modal ${isOpen ? 'active' : ''}`} onClick={closeModal}>
+      <div
+        ref={modalContentRef}
+        className="auth-modal-content"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button className="auth-modal-close" type="button" onClick={closeModal} aria-label="Закрыть">
+          ×
+        </button>
+
+        {hasSession && user ? (
+          <>
+            <h2 className="auth-modal-title">Профиль</h2>
+            <div className="user-info">
+              <p><strong>Электронная почта:</strong> {user.email}</p>
+              <p><strong>Роль:</strong> {user.role}</p>
+              <p><strong>Идентификатор пользователя:</strong> {user.userId}</p>
+            </div>
+            <button type="button" className="btn btn-secondary btn-logout" onClick={goToCabinet}>
+              Личный кабинет
+            </button>
+            <button type="button" className="btn btn-danger btn-logout" onClick={handleLogout}>
+              Выйти
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="auth-modal-title">{mode === 'login' ? 'Вход' : 'Регистрация'}</h2>
+
+            <form className="auth-form" onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="email">Электронная почта</label>
+                <input
+                  id="email"
+                  className="form-control"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Введите электронную почту"
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="password">Пароль</label>
+                <div className="password-input-wrapper">
+                  <input
+                    id="password"
+                    className="form-control"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Введите пароль"
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  />
+                  <button
+                    className="password-toggle"
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={loading}
+                  >
+                    {showPassword ? 'Скрыть' : 'Показать'}
+                  </button>
+                </div>
+              </div>
+
+              {error ? <p className="error-text">{error}</p> : null}
+
+              <button type="submit" className="btn btn-primary btn-login" disabled={loading}>
+                {loading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+              </button>
+            </form>
+
+            <div className="auth-toggle">
+              {mode === 'login' ? (
+                <p>
+                  Нет аккаунта?
+                  <button type="button" className="auth-toggle-btn" onClick={() => setMode('register')}>
+                    Зарегистрироваться
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Уже есть аккаунт?
+                  <button type="button" className="auth-toggle-btn" onClick={() => setMode('login')}>
+                    Войти
+                  </button>
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="auth-button">
+    <>
+      <div className="auth-button">
       {hasSession ? (
         <div className="user-profile">
           <button
@@ -194,99 +304,8 @@ export default function AuthModal() {
           👤
         </button>
       )}
-
-      <div className={`auth-modal ${isOpen ? 'active' : ''}`} onClick={closeModal}>
-        <div className="auth-modal-content" onClick={(event) => event.stopPropagation()}>
-          <button className="auth-modal-close" type="button" onClick={closeModal} aria-label="Закрыть">
-            ×
-          </button>
-
-          {hasSession && user ? (
-            <>
-              <h2 className="auth-modal-title">Профиль</h2>
-              <div className="user-info">
-                <p><strong>Электронная почта:</strong> {user.email}</p>
-                <p><strong>Роль:</strong> {user.role}</p>
-                <p><strong>Идентификатор пользователя:</strong> {user.userId}</p>
-              </div>
-              <button type="button" className="btn btn-secondary btn-logout" onClick={goToCabinet}>
-                Личный кабинет
-              </button>
-              <button type="button" className="btn btn-danger btn-logout" onClick={handleLogout}>
-                Выйти
-              </button>
-            </>
-          ) : (
-            <>
-              <h2 className="auth-modal-title">{mode === 'login' ? 'Вход' : 'Регистрация'}</h2>
-
-              <form className="auth-form" onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label htmlFor="email">Электронная почта</label>
-                  <input
-                    id="email"
-                    className="form-control"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Введите электронную почту"
-                    autoComplete="email"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="password">Пароль</label>
-                  <div className="password-input-wrapper">
-                    <input
-                      id="password"
-                      className="form-control"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Введите пароль"
-                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                    />
-                    <button
-                      className="password-toggle"
-                      type="button"
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      disabled={loading}
-                    >
-                      {showPassword ? 'Скрыть' : 'Показать'}
-                    </button>
-                  </div>
-                </div>
-
-                {error ? <p className="error-text">{error}</p> : null}
-
-                <button type="submit" className="btn btn-primary btn-login" disabled={loading}>
-                  {loading ? 'Загрузка...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
-                </button>
-              </form>
-
-              <div className="auth-toggle">
-                {mode === 'login' ? (
-                  <p>
-                    Нет аккаунта?
-                    <button type="button" className="auth-toggle-btn" onClick={() => setMode('register')}>
-                      Зарегистрироваться
-                    </button>
-                  </p>
-                ) : (
-                  <p>
-                    Уже есть аккаунт?
-                    <button type="button" className="auth-toggle-btn" onClick={() => setMode('login')}>
-                      Войти
-                    </button>
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-        </div>
       </div>
-    </div>
+      {createPortal(modalMarkup, document.body)}
+    </>
   );
 }

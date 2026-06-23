@@ -1,16 +1,21 @@
 package com.medisystem.appointment.service;
 
 import com.medisystem.appointment.dto.AppointmentCreateRequest;
+import com.medisystem.appointment.dto.AppointmentReviewCreateRequest;
 import com.medisystem.appointment.dto.AppointmentUpdateRequest;
 import com.medisystem.appointment.dto.publicapi.PublicBusyAppointmentSlotResponse;
+import com.medisystem.appointment.dto.shared.DoctorReviewItem;
 import com.medisystem.appointment.entity.Appointment;
 import com.medisystem.appointment.entity.AppointmentStatus;
 import com.medisystem.appointment.entity.Doctor;
-import com.medisystem.appointment.exception.DoctorNotFoundException;
+import com.medisystem.appointment.entity.DoctorReview;
+import com.medisystem.appointment.entity.ReviewStatus;
 import com.medisystem.appointment.exception.AppointmentNotFoundException;
+import com.medisystem.appointment.exception.DoctorNotFoundException;
 import com.medisystem.appointment.messaging.AppointmentEventPublisher;
 import com.medisystem.appointment.repo.AppointmentRepository;
 import com.medisystem.appointment.repo.DoctorRepository;
+import com.medisystem.appointment.repo.DoctorReviewRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,17 +29,20 @@ public class AppointmentService {
 
     private final AppointmentRepository repo;
     private final DoctorRepository doctorRepository;
+    private final DoctorReviewRepository doctorReviewRepository;
     private final AppointmentEventPublisher appointmentEventPublisher;
     private final UserNotificationService userNotificationService;
 
     public AppointmentService(
             AppointmentRepository repo,
             DoctorRepository doctorRepository,
+            DoctorReviewRepository doctorReviewRepository,
             AppointmentEventPublisher appointmentEventPublisher,
             UserNotificationService userNotificationService
     ) {
         this.repo = repo;
         this.doctorRepository = doctorRepository;
+        this.doctorReviewRepository = doctorReviewRepository;
         this.appointmentEventPublisher = appointmentEventPublisher;
         this.userNotificationService = userNotificationService;
     }
@@ -87,9 +95,16 @@ public class AppointmentService {
     }
 
     @Transactional(readOnly = true)
+    public List<DoctorReviewItem> getMyReviews(long userId) {
+        return doctorReviewRepository.findAllByCreatedByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(this::toReviewItem)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<PublicBusyAppointmentSlotResponse> getBusySlots(Long doctorId, LocalDate dateFrom, LocalDate dateTo) {
         ensureDoctorExists(doctorId);
-        LocalDate rangeStart = dateFrom == null ? LocalDate.now() : dateFrom;
+        LocalDate rangeStart = dateFrom == null ? ClinicTime.today() : dateFrom;
         LocalDate rangeEnd = dateTo == null ? rangeStart : dateTo;
         if (rangeEnd.isBefore(rangeStart)) {
             throw new IllegalArgumentException("Дата окончания периода не может быть раньше даты начала");
@@ -161,6 +176,32 @@ public class AppointmentService {
     }
 
     @Transactional
+    public DoctorReviewItem createReviewMine(long userId, Long appointmentId, AppointmentReviewCreateRequest req) {
+        Appointment appointment = getById(appointmentId);
+
+        if (appointment.getCreatedByUserId() == null || !appointment.getCreatedByUserId().equals(userId)) {
+            throw new IllegalArgumentException("Можно оставить отзыв только по своему приему");
+        }
+        if (appointment.getStatus() != AppointmentStatus.COMPLETED) {
+            throw new IllegalArgumentException("Отзыв можно оставить только по завершенному приему");
+        }
+        if (doctorReviewRepository.findByAppointmentId(appointmentId).isPresent()) {
+            throw new IllegalArgumentException("Отзыв по этому приему уже оставлен");
+        }
+
+        Doctor doctor = requireDoctor(appointment.getDoctorId());
+        DoctorReview review = new DoctorReview();
+        review.setDoctor(doctor);
+        review.setAppointmentId(appointmentId);
+        review.setCreatedByUserId(userId);
+        review.setAuthorName(resolveReviewAuthorName(appointment));
+        review.setRating(req.rating());
+        review.setText(req.text().trim());
+        review.setStatus(ReviewStatus.APPROVED);
+        return toReviewItem(doctorReviewRepository.save(review));
+    }
+
+    @Transactional
     public Appointment update(Long id, AppointmentUpdateRequest req) {
         Appointment appointment = getById(id);
         validateUpdateRequest(req, id);
@@ -209,7 +250,7 @@ public class AppointmentService {
         if (date == null || time == null) {
             throw new IllegalArgumentException("Необходимо указать дату и время приема");
         }
-        if (LocalDateTime.of(date, time).isBefore(LocalDateTime.now())) {
+        if (LocalDateTime.of(date, time).isBefore(ClinicTime.nowDateTime())) {
             throw new IllegalArgumentException("Запись на прием должна быть оформлена на будущую дату и время");
         }
     }
@@ -252,5 +293,28 @@ public class AppointmentService {
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("Выбранный слот уже занят");
         }
+    }
+
+    private String resolveReviewAuthorName(Appointment appointment) {
+        if (appointment.getPatientFullName() != null && !appointment.getPatientFullName().isBlank()) {
+            return appointment.getPatientFullName().trim();
+        }
+        if (appointment.getPatientEmail() != null && !appointment.getPatientEmail().isBlank()) {
+            return appointment.getPatientEmail().trim();
+        }
+        return "Пациент";
+    }
+
+    private DoctorReviewItem toReviewItem(DoctorReview review) {
+        return new DoctorReviewItem(
+                review.getId(),
+                review.getDoctor().getId(),
+                review.getAppointmentId(),
+                review.getAuthorName(),
+                review.getRating(),
+                review.getText(),
+                review.getStatus().name(),
+                review.getCreatedAt()
+        );
     }
 }

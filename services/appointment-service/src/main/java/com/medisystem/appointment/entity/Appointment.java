@@ -62,6 +62,24 @@ public class Appointment {
     @Column(name = "completion_summary", columnDefinition = "text")
     private String completionSummary;
 
+    @Column(name = "complaints", columnDefinition = "text")
+    private String complaints;
+
+    @Column(name = "anamnesis", columnDefinition = "text")
+    private String anamnesis;
+
+    @Column(name = "objective_findings", columnDefinition = "text")
+    private String objectiveFindings;
+
+    @Column(name = "diagnosis", columnDefinition = "text")
+    private String diagnosis;
+
+    @Column(name = "prescriptions", columnDefinition = "text")
+    private String prescriptions;
+
+    @Column(name = "treatment_plan", columnDefinition = "text")
+    private String treatmentPlan;
+
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
 
@@ -127,6 +145,30 @@ public class Appointment {
         return completionSummary;
     }
 
+    public String getComplaints() {
+        return complaints;
+    }
+
+    public String getAnamnesis() {
+        return anamnesis;
+    }
+
+    public String getObjectiveFindings() {
+        return objectiveFindings;
+    }
+
+    public String getDiagnosis() {
+        return diagnosis;
+    }
+
+    public String getPrescriptions() {
+        return prescriptions;
+    }
+
+    public String getTreatmentPlan() {
+        return treatmentPlan;
+    }
+
     public OffsetDateTime getCompletedAt() {
         return completedAt;
     }
@@ -189,6 +231,30 @@ public class Appointment {
 
     public void setCompletionSummary(String completionSummary) {
         this.completionSummary = completionSummary;
+    }
+
+    public void setComplaints(String complaints) {
+        this.complaints = complaints;
+    }
+
+    public void setAnamnesis(String anamnesis) {
+        this.anamnesis = anamnesis;
+    }
+
+    public void setObjectiveFindings(String objectiveFindings) {
+        this.objectiveFindings = objectiveFindings;
+    }
+
+    public void setDiagnosis(String diagnosis) {
+        this.diagnosis = diagnosis;
+    }
+
+    public void setPrescriptions(String prescriptions) {
+        this.prescriptions = prescriptions;
+    }
+
+    public void setTreatmentPlan(String treatmentPlan) {
+        this.treatmentPlan = treatmentPlan;
     }
 
     public void setCompletedAt(OffsetDateTime completedAt) {
